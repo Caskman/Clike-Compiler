@@ -1,0 +1,17 @@
+#! /usr/bin/env bash
+
+make clean
+make
+
+if [ $? -ne 0 ]
+then
+	echo "Compilaton Problems"
+	exit 1
+fi
+
+echo "*****Legal Cases*****"
+../testharness parse Testing/Legal
+echo "*****Illegal Cases*****"
+../testharness parse Testing/Illegal
+
+
