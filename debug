@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+make clean
+make FLAGS="-g"
+
+if [ $? -ne 0 ]
+then
+	echo "Compilaton Problems"
+	exit 1
+fi
+
+gdb parse
+

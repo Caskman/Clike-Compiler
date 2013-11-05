@@ -10,6 +10,6 @@ then
 fi
 
 echo "*****Illegal Cases*****"
-../testharness parse Testing/Illegal
+./testharness parse Testing/Illegal
 
 

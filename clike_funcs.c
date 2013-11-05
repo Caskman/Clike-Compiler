@@ -82,7 +82,7 @@ FuncSym* dupFuncSym(FuncSym *data) {
     f->is_defined = data->is_defined;
     f->return_type = data->return_type;
     if (data->args_type_list != NULL) f->args_type_list = dupTypeList(data->args_type_list);
-    f->args_id_list = dupStringList(data->args_id_list);
+    if (data->args_id_list != NULL) f->args_id_list = dupStringList(data->args_id_list);
     return f;
 }
 
