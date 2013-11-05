@@ -60,7 +60,7 @@
 "while" {return WHILE;}
 
  /* Identifiers */
-[a-zA-Z_]+([a-zA-Z_]|[0-9])* {yylval.s = strdup(yytext); return ID;} 
+[a-zA-Z_]+([a-zA-Z_]|[0-9])* {yylval.string = strdup(yytext); return ID;} 
 
  /* Decimal Integers */
 [1-9][0-9]*(([uU][lL]{1,2})|([lL]{1,2}[uU]?))? { return INTEGER;}
@@ -132,7 +132,7 @@
 "..." {return ELL;}
 
  /* Strings */
-\"(\\.|[^"])*\" {yylval.s = strdup(yytext); return STRING;}
+\"(\\.|[^"])*\" {yylval.string = strdup(yytext); return STRING;}
 
 
  /* Newlines */

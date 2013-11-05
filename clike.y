@@ -2,6 +2,7 @@
 %{
 	#include "clike.h"
 	#include <string.h>
+	#include "funcsymlist.h"
 %}
 
 %union {
@@ -10,6 +11,7 @@
 	String string;
 	FuncSym *func;
 	FuncSymList *func_list;
+	TypeList *type_list;
 }
 
 %token <d> INTEGER
@@ -19,7 +21,10 @@
 %token <d> FLOAT FOR GOTO IF INT LONG RETURN SHORT SIGNED SIZEOF STRUCT SWITCH TYPEDEF UNION UNSIGNED VOID WHILE D_AMP D_BAR D_EQ NOT_EQ LESS_EQ GREAT_EQ
 %token <d> PLUS_EQ MIN_EQ MULT_EQ DIV_EQ PERC_EQ BSHFTL_EQ BSHFTR_EQ AND_EQ XOR_EQ OR_EQ DERIVES INC DECR BSHFTR BSHFTL ELL UMINUS NOT
 
-
+%type <d> type
+%type <func_list> f_prot_list
+%type <func> f_prot
+%type <type_list> type_list
 
 
 %left D_BAR
@@ -122,10 +127,8 @@ func_header:
 	| VOID ID '(' id_list ')'
 	| type ID '(' id_list ')'
 dcl:
-	type {current_type = $1;}
-		dclr_list
-	| VOID {current_type = VOID;}
-		f_prot_list {checkFuncSymListForDups($3); checkFuncSymTable(global_func_table,$3);}
+	type dclr_list
+	| VOID f_prot_list {setTypesFuncSymList($2,$1); checkFuncSymListForDups($2); checkFuncSymTable(global_func_table,$2);}
 dclr_list:
 	dclr
 	| dclr ',' dclr_list
@@ -139,13 +142,13 @@ array_size:
 	'[' INTEGER ']'
 f_prot_list:
 	f_prot {$$ = makeSEFuncSymList($1);}
-	| f_prot ',' f_prot_list {$$ = appendFuncSymList($3,$1);}
+	| f_prot ',' f_prot_list {$$ = appendFuncSym($3,$1);}
 f_prot:
-	ID '(' type_list ')' {$$ = newFProt(current_type,$1,$3);}
+	ID '(' type_list ')' {$$ = newFProt(0,$1,$3);}
 	| ID '(' ')' {$$ = newFProt(current_type,$1,newTypeList());}
 type_list:
-	type {$$ = makeSETypeList($1);}
-	| type ',' type_list {$$ = appendTypeList($3,$1);}
+	type {$$ = makeSETypeListWP($1);}
+	| type ',' type_list {$$ = appendTypeWP($3,$1);}
 type:
 	CHAR
 	| INT 
