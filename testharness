@@ -57,6 +57,7 @@ for testfile in $testfiles ; do
 
 	./$exec < $in > $out 2> $err
 	cat $out
+	cat $err
 	# diff $out $outexpect > $outdiff
 	# cat $outdiff
 	# diff $err $errexpect > $errdiff

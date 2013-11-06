@@ -7,6 +7,8 @@
 #include "stringlist.h"
 #include "typelist.h"
 
+typedef struct string_k_sym_v_hash_table StringKSymVHashTable;
+
 typedef struct sym {
     int sym_type;
     String id;
@@ -14,6 +16,7 @@ typedef struct sym {
     Type type;
     TypeList *args_type_list;
     StringList *args_id_list;
+    StringKSymVHashTable *scope;
 } Sym;
 
 void printString(String *data);
