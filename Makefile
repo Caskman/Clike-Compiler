@@ -1,8 +1,8 @@
 FLAGS=
 TEMPLATE_EXE="../Structures/template/template"
 
-parse: clike_funcs.c clike.tab.c clike.lex.c stringkfuncsymvhashtable.c stringkvarsymvhashtable.c typelist.c stringlist.c funcsymlist.c
-	gcc -Wall ${FLAGS} clike_funcs.c clike.lex.c -lfl -o $@ clike.tab.c stringkfuncsymvhashtable.c stringkfuncsymventrylist.c stringkvarsymvhashtable.c stringkvarsymventrylist.c typelist.c stringlist.c funcsymlist.c 
+parse: clike_funcs.c clike.tab.c clike.lex.c stringksymvhashtable.c typelist.c stringlist.c symlist.c
+	gcc -Wall ${FLAGS} clike_funcs.c clike.lex.c -lfl -o $@ clike.tab.c stringksymvhashtable.c stringksymventrylist.c typelist.c stringlist.c symlist.c 
 
 clike.lex.c: clike.tab.c clike.l
 	flex -o clike.lex.c clike.l
@@ -10,8 +10,8 @@ clike.lex.c: clike.tab.c clike.l
 clike.tab.c: clike.y
 	bison -dv clike.y --report=solved
 
-stringkfuncsymvhashtable.c: stringkfuncsymvhashtable_imp.h
-	${TEMPLATE_EXE} -t "String,FuncSym"
+stringksymvhashtable.c: stringksymvhashtable_imp.h
+	${TEMPLATE_EXE} -t "String,Sym"
 
 stringkvarsymvhashtable.c: stringkvarsymvhashtable_imp.h
 	${TEMPLATE_EXE} -t "String,VarSym"
@@ -22,8 +22,8 @@ typelist.c: typelist_imp.h
 stringlist.c: stringlist_imp.h
 	${TEMPLATE_EXE} -l String
 
-funcsymlist.c: funcsymlist_imp.h
-	${TEMPLATE_EXE} -l FuncSym
+symlist.c: symlist_imp.h
+	${TEMPLATE_EXE} -l Sym
 
 .PHONY: clean 
 

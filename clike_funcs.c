@@ -4,15 +4,14 @@
 #include <string.h>
 #include <stdarg.h>
 #include "clike.h"
-#include "stringkfuncsymvhashtable.h"
-#include "stringkvarsymvhashtable.h"
+#include "stringksymvhashtable.h"
 #include "clike.tab.h"
+#include "clike_types.h"
 
 int line = 1;
 int inComments = 0;
 Type current_type = -1;
-StringKFuncSymVHashTable *global_func_table;
-StringKVarSymVHashTable *global_var_table;
+StringKSymVHashTable *global_sym_table;
 
 //================String=====================
 
@@ -50,68 +49,44 @@ unsigned int hashString(String *key) {
 
 //==========================================
 
-//================FuncSym================
+//================Sym================
 
-FuncSym* newFuncSym(String id,int is_defined,Type return_type,TypeList *args_type_list,StringList *args_id_list) {
-    FuncSym *f = (FuncSym*)malloc(sizeof(FuncSym));
+Sym* newSym(String id,int sym_type,int is_defined,Type type,TypeList *args_type_list,StringList *args_id_list) {
+    Sym *f = (Sym*)malloc(sizeof(Sym));
     f->id = id;
+    f->sym_type = sym_type;
     f->is_defined = is_defined;
-    f->return_type = return_type;
+    f->type = type;
     f->args_type_list = args_type_list;
     f->args_id_list = args_id_list;
     return f;
 }
 
-void printFuncSym(FuncSym *data) {
+void printSym(Sym *data) {
     // printf("");
 }
-void freeFuncSym(FuncSym *data) {
+void freeSym(Sym *data) {
     free(data->id);
     freeTypeList(data->args_type_list);
     freeStringList(data->args_id_list);
     free(data);
 }
 
-int compareFuncSym(FuncSym *a,FuncSym *b) {
+int compareSym(Sym *a,Sym *b) {
     return compareString(&a->id,&b->id);
 }
 
-FuncSym* dupFuncSym(FuncSym *data) {
-    FuncSym *f = (FuncSym*)malloc(sizeof(FuncSym));
+Sym* dupSym(Sym *data) {
+    Sym *f = (Sym*)malloc(sizeof(Sym));
     f->id = (char*)strdup(data->id);
+    f->sym_type = data->sym_type;
     f->is_defined = data->is_defined;
-    f->return_type = data->return_type;
+    f->type = data->type;
     if (data->args_type_list != NULL) f->args_type_list = dupTypeList(data->args_type_list);
     if (data->args_id_list != NULL) f->args_id_list = dupStringList(data->args_id_list);
     return f;
 }
 
-//======================================
-
-//==============VarSym===================
-
-void printVarSym(VarSym *data) {
-
-}
-
-void freeVarSym(VarSym *data) {
-    free(data->id);
-    free(data);
-}
-
-int compareVarSym(VarSym *a,VarSym *b) {
-    return compareString(&a->id,&b->id);
-}
-
-VarSym* dupVarSym(VarSym *data) {
-    VarSym *v = (VarSym*)malloc(sizeof(VarSym));
-    v->id = strdup(data->id);
-    v->type = data->type;
-    return v;
-}
-
-
-//========================================
 
 //===============Type===================
 
@@ -137,58 +112,72 @@ Type* dupType(Type *data) {
 
 
 /* checks the symbol table against the list of function symbols; each function symbol could be a prototype or a function definition */
-void checkFuncSymTable(StringKFuncSymVHashTable *table,FuncSymList *list) {
-    FuncSymNode *node;
-    FuncSym *func;
+void checkAndLogSymTable(StringKSymVHashTable *table,SymList *list) {
+    SymNode *node;
+    Sym *sym;
 
     for (node = list->head->next; node != NULL; node = node->next) {
-        func = getValueStringKFuncSymVHashTable(table,&node->data->id);
-        if (func == NULL) {// match does not exist
+        sym = getValueStringKSymVHashTable(table,&node->data->id);
+        if (sym == NULL) {// match does not exist
             String *id = dupString(&node->data->id);
-            putStringKFuncSymVHashTable(table,id,dupFuncSym(node->data));
+            putStringKSymVHashTable(table,id,dupSym(node->data));
         } else {// match exists
-            if (node->data->is_defined) { // if the current function is not a function prototype
-                if (func->is_defined) {// the function grabbed from the table is not a prototype
-                    // incorrect because you can't define a function twice
-                    yyerror("");
-                    fprintf(stderr,"\tduplicate definition of <%s>\n",func->id);
-                } else {// the function grabbed from the table is a prototype
-                    // prototype was already in the table and now you have a definition -- CORRECT
-                    if (func->return_type != node->data->return_type) {
-                        yyerror("");
-                        fprintf(stderr,"\t<%s> function return type does not match prototype\n",func->id);
-                    } else if (compareStringList(func->args_id_list,node->data->args_id_list) != 0) {
-                        yyerror("");
-                        fprintf(stderr,"\t<%s> function argument list does not match prototype argument list\n",func->id);
-                    } else {// if all's good, replace the prototype entry with the function definition
-                        freeFuncSym(removeStringKFuncSymVHashTable(table,&func->id));
-                        putStringKFuncSymVHashTable(table,dupString(&node->data->id),dupFuncSym(node->data));
-                    }
+            if (node->data->sym_type != sym->sym_type) {
+                yyerror("");
+                if (sym->sym_type == CLIKE_VAR) {
+                    fprintf(stderr,"\tvariable <%s> is already defined, so a function named <%s> cannot exist\n",sym->id,sym->id);
+                } else {
+                    fprintf(stderr,"\tfunction <%s> is already defined, so a variable named <%s> cannot exist\n",sym->id,sym->id);
                 }
-            } else { // if the current function is a function prototype
-                if (func->is_defined) { // the function grabbed from the table is not a prototype
-                    // Function has already been defined
-                    // char *message;
-                    // casksprintf(&message,"function <%s> has already been defined",1,node->data->id);
-                    yyerror("");
-                    fprintf(stderr,"\tfunction <%s> has already been defined\n",node->data->id);
-                    // free(message);
-                } else { // the function grabbed from the table is a prototype
-                    // Function prototype has already been declared
-
-                    yyerror("");
-                    fprintf(stderr,"\tfunction prototype <%s> has already been defined",func->id);
-                }
+            } else if (sym->sym_type == CLIKE_FUNC) {
+                checkMatchingFuncSym(table,node->data,sym);
+            } else if (sym->sym_type == CLIKE_VAR) {
+                yyerror("");
+                fprintf(stderr,"\t<%s> has already been defined\n",sym->id);
             }
         }
     }
-
-
 }
 
-/* checks the list to see if there are any FuncSym objects with the same id */
-void checkFuncSymListForDups(FuncSymList *list) {
-    FuncSymNode *cur,*node;
+/* Given a new function symbol and a matched existing function symbol entry from the table,
+ * checks if the existing entry (prototype) can be updated with the new symbol (definition) */
+void checkMatchingFuncSym(StringKSymVHashTable *table,Sym *new_func_sym,Sym *sym_entry) {
+    if (new_func_sym->is_defined) { // if the current function is not a function prototype
+        if (sym_entry->is_defined) {// the function grabbed from the table is not a prototype
+            // incorrect because you can't define a function twice
+            yyerror("");
+            fprintf(stderr,"\tduplicate definition of <%s>\n",sym_entry->id);
+        } else {// the function grabbed from the table is a prototype
+            // prototype was already in the table and now you have a definition -- CORRECT
+            if (sym_entry->type != new_func_sym->type) {
+                yyerror("");
+                fprintf(stderr,"\t<%s> function return type does not match prototype\n",sym_entry->id);
+            } else if (compareStringList(sym_entry->args_id_list,new_func_sym->args_id_list) != 0) {
+                yyerror("");
+                fprintf(stderr,"\t<%s> function argument list does not match prototype argument list\n",sym_entry->id);
+            } else {// if all's good, replace the prototype entry with the function definition
+                freeSym(removeStringKSymVHashTable(table,&sym_entry->id));
+                putStringKSymVHashTable(table,dupString(&new_func_sym->id),dupSym(new_func_sym));
+            }
+        }
+    } else { // if the current function is a function prototype
+        if (sym_entry->is_defined) { // the function grabbed from the table is not a prototype
+            // Function has already been defined
+            yyerror("");
+            fprintf(stderr,"\tfunction <%s> has already been defined\n",new_func_sym->id);
+            // free(message);
+        } else { // the function grabbed from the table is a prototype
+            // Function prototype has already been declared
+
+            yyerror("");
+            fprintf(stderr,"\tfunction prototype <%s> has already been defined\n",sym_entry->id);
+        }
+    }
+}
+
+/* checks the list to see if there are any Sym objects with the same id */
+void checkSymListForDups(SymList *list) {
+    SymNode *cur,*node;
     for (cur = list->head->next; cur != NULL; cur = cur->next) {
         for (node = cur->next; node != NULL; node = node->next) {
             if (compareString(&cur->data->id,&node->data->id) == 0) { // duplicate found
@@ -199,17 +188,24 @@ void checkFuncSymListForDups(FuncSymList *list) {
     }
 }
 
-/* construct a FuncSym object */
-FuncSym* newFProt(Type type,char *id,TypeList *type_list) {
-    return newFuncSym(id,0,type,type_list,NULL);
+
+/* construct a Sym object */
+Sym* newFProt(Type type,char *id,TypeList *type_list) {
+    return newSym(id,CLIKE_FUNC,0,type,type_list,NULL);
 }
 
-void setTypesFuncSymList(FuncSymList *list,Type type) {
-    FuncSymNode *node;
-    for (node = list->head->next; node != NULL; node = node->next) {
-        node->data->return_type = type;
-    }
+Sym* newVarDecl(Type type,String id,int array_size) {
+    return newSym(id,CLIKE_VAR,1,type,NULL,NULL);
 }
+
+SymList* setTypesSymList(SymList *list,Type type) {
+    SymNode *node;
+    for (node = list->head->next; node != NULL; node = node->next) {
+        node->data->type = type;
+    }
+    return list;
+}
+
 
 /* Only does strings for now */
 // void casksprintf(char **dest,char *format,int n,...) {
@@ -236,8 +232,7 @@ void logg(char const *s) {
 
 
 int main() {
-    global_func_table = newStringKFuncSymVHashTable(20);
-    global_var_table = newStringKVarSymVHashTable(20);
+    global_sym_table = newStringKSymVHashTable(20);
 	yyparse();
 	yylex_destroy();
 	if (inComments) {

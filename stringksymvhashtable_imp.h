@@ -1,29 +1,30 @@
 
 
-#ifndef STRINGKFUNCSYMVHASHTABLE_IMP
-#define STRINGKFUNCSYMVHASHTABLE_IMP
+#ifndef STRINGKSYMVHASHTABLE_IMP
+#define STRINGKSYMVHASHTABLE_IMP
 
 #include "clike_types.h"
 #include "stringlist.h"
 #include "typelist.h"
 
-typedef struct func_sym {
+typedef struct sym {
+    int sym_type;
     String id;
     int is_defined;
-    Type return_type;
+    Type type;
     TypeList *args_type_list;
     StringList *args_id_list;
-} FuncSym;
+} Sym;
 
 void printString(String *data);
-void printFuncSym(FuncSym *data);
+void printSym(Sym *data);
 unsigned int hashString(String *key);
 void freeString(String *data);
 int compareString(String *a,String *b);
 String* dupString(String *data);
-FuncSym* dupFuncSym(FuncSym *data);
+Sym* dupSym(Sym *data);
 
-void freeFuncSym(FuncSym *data);
+void freeSym(Sym *data);
 
 #endif
 

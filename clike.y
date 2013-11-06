@@ -2,15 +2,14 @@
 %{
 	#include "clike.h"
 	#include <string.h>
-	#include "funcsymlist.h"
 %}
 
 %union {
 	int d;
 	double f;
 	String string;
-	FuncSym *func;
-	FuncSymList *func_list;
+	Sym *sym;
+	SymList *sym_list;
 	TypeList *type_list;
 }
 
@@ -21,9 +20,10 @@
 %token <d> FLOAT FOR GOTO IF INT LONG RETURN SHORT SIGNED SIZEOF STRUCT SWITCH TYPEDEF UNION UNSIGNED VOID WHILE D_AMP D_BAR D_EQ NOT_EQ LESS_EQ GREAT_EQ
 %token <d> PLUS_EQ MIN_EQ MULT_EQ DIV_EQ PERC_EQ BSHFTL_EQ BSHFTR_EQ AND_EQ XOR_EQ OR_EQ DERIVES INC DECR BSHFTR BSHFTL ELL UMINUS NOT
 
-%type <d> type
-%type <func_list> f_prot_list
-%type <func> f_prot
+%type <sym_list> dcl
+%type <d> type array_size opt_array_size
+%type <sym_list> f_prot_list dclr_list
+%type <sym> f_prot dclr
 %type <type_list> type_list
 
 
@@ -44,7 +44,7 @@ prog_element_list:
 	prog_element
 	| prog_element prog_element_list
 prog_element:
-	dcl ';'
+	dcl ';' {checkSymListForDups($1); checkAndLogSymTable(global_sym_table,$1);}
 	| func
 func:
 	func_header opt_loc_dcl_list '{' opt_loc_dcl_list opt_stmt_list '}'
@@ -127,33 +127,33 @@ func_header:
 	| VOID ID '(' id_list ')'
 	| type ID '(' id_list ')'
 dcl:
-	type dclr_list
-	| VOID f_prot_list {setTypesFuncSymList($2,$1); checkFuncSymListForDups($2); checkFuncSymTable(global_func_table,$2);}
+	type dclr_list {$$ = setTypesSymList($2,$1);}
+	| VOID f_prot_list {$$ = setTypesSymList($2,$1);}
 dclr_list:
-	dclr
-	| dclr ',' dclr_list
+	dclr {$$ = makeSESymList($1);}
+	| dclr ',' dclr_list {$$ = appendSym($3,$1);}
 dclr:
-	f_prot
-	| ID opt_array_size
+	f_prot {$$ = $1;}
+	| ID opt_array_size {$$ = newVarDecl(VOID,$1,$2);}
 opt_array_size:
-	/* epsilon */
-	| array_size
+	/* epsilon */ {$$ = -1;}
+	| array_size {$$ = $1;}
 array_size:
-	'[' INTEGER ']'
+	'[' INTEGER ']' {$$ = $2;}
 f_prot_list:
-	f_prot {$$ = makeSEFuncSymList($1);}
-	| f_prot ',' f_prot_list {$$ = appendFuncSym($3,$1);}
+	f_prot {$$ = makeSESymList($1);}
+	| f_prot ',' f_prot_list {$$ = appendSym($3,$1);}
 f_prot:
 	ID '(' type_list ')' {$$ = newFProt(0,$1,$3);}
 	| ID '(' ')' {$$ = newFProt(current_type,$1,newTypeList());}
 type_list:
-	type {$$ = makeSETypeListWP($1);}
-	| type ',' type_list {$$ = appendTypeWP($3,$1);}
+	type {$$ = makeSETypeListWoP($1);}
+	| type ',' type_list {$$ = appendTypeWoP($3,$1);}
 type:
-	CHAR
-	| INT 
-	| FLOAT
-	| DOUBLE_DECL
+	CHAR {$$ = $1;}
+	| INT {$$ = $1;}
+	| FLOAT {$$ = $1;}
+	| DOUBLE_DECL {$$ = $1;}
 %%
 
 
