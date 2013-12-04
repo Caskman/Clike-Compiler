@@ -112,9 +112,15 @@ expr:
     | expr '<' expr {$$ = resolveExpr($2,$1,$3);}
     | expr '>' expr {$$ = resolveExpr($2,$1,$3);}
     | '(' expr ')'  {$$ = $2;}
-	| ID {$$ = stringToExpr(current_scope,$1);}
+	| ID opt_id_decorator {$$ = stringToExpr(current_scope,$1);}
 	| INTEGER {$$ = newExpr(INT);}
 	| DOUBLE {$$ = newExpr(DOUBLE);}
+opt_id_decorator:
+	/* epsilon */
+	| id_decorator
+id_decorator:
+	'(' opt_expr_list ')'
+	| '[' expr ']'
 opt_loc_dcl_list:
 	/* epsilon */ {$$ = newSymList();}
 	| loc_dcl_list {$$ = $1;}
