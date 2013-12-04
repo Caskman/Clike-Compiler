@@ -147,7 +147,7 @@ Expr* emptyExpr() {
 
 //======================================
 
-//===============Expr==================
+//===============Assg==================
 
 Assg* newAssg(Sym *sym,Expr *index,Expr *expr) {
     Assg *newa = (Assg*)malloc(sizeof(Assg));
@@ -164,7 +164,25 @@ Assg* emptyAssg() {
 
 //======================================
 
+//===============Stmt==================
 
+void printStmt(Stmt *data) {
+
+}
+
+void freeStmt(Stmt *data) {
+
+}
+
+Stmt* dupStmt(Stmt *data) {
+    return NULL;
+}
+
+int compareStmt(Stmt *a,Stmt *b) {
+    return 0;
+}
+
+//======================================
 
 //================SEMANTICS=============================
 

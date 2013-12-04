@@ -12,11 +12,6 @@ typedef int Type;
 
 
 
-// #include "stmtlist.h"
-
-// typedef for_stmt {
-
-// }
 
 
 

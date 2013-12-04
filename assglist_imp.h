@@ -2,6 +2,8 @@
 #ifndef ASSGLIST_IMP
 #define ASSGLIST_IMP
 
+typedef struct sym Sym;
+
 typedef struct assg {
     Sym *sym;
     Expr *index,*expr;

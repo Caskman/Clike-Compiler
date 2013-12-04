@@ -9,6 +9,7 @@
 #include "exprlist_imp.h"
 #include "exprlist.h"
 #include "assglist_imp.h"
+#include "stmtlist_imp.h"
 
 void yyerror(char const *s);
 void logg(char const *s);

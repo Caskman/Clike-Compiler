@@ -1,8 +1,8 @@
 FLAGS=
 TEMPLATE_EXE="../Structures/template/template"
 
-parse: clike_funcs.c clike.tab.c clike.lex.c stringksymvhashtable.c typelist.c stringlist.c symlist.c exprlist.c
-	gcc -Wall ${FLAGS} clike_funcs.c clike.lex.c -lfl -o $@ clike.tab.c stringksymvhashtable.c stringksymventrylist.c typelist.c stringlist.c symlist.c exprlist.c
+parse: clike_funcs.c clike.tab.c clike.lex.c stringksymvhashtable.c typelist.c stringlist.c symlist.c exprlist.c stmtlist.c
+	gcc -Wall ${FLAGS} clike_funcs.c clike.lex.c -lfl -o $@ clike.tab.c stringksymvhashtable.c stringksymventrylist.c typelist.c stringlist.c symlist.c exprlist.c stmtlist.c
 
 clike.lex.c: clike.tab.c clike.l
 	flex -o clike.lex.c clike.l
@@ -27,6 +27,9 @@ symlist.c: symlist_imp.h
 
 exprlist.c: exprlist_imp.h
 	${TEMPLATE_EXE} -l Expr
+
+stmtlist.c: stmtlist_imp.h
+	${TEMPLATE_EXE} -l Stmt
 
 .PHONY: clean 
 
