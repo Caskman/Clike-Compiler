@@ -69,7 +69,7 @@ stmt:
 	| IF '(' expr ')' stmt else_clause
 	| FOR for_control opt_stmt
 	| ID '(' opt_expr_list ')'
-	| RETURN expr 
+	| RETURN opt_expr 
 	| assg
 	| '{' opt_stmt_list '}'
 for_control:
