@@ -141,10 +141,55 @@ Expr* newExpr(Type type) {
     return newe;
 }
 
+Expr* emptyExpr() {
+    return newExpr(VOID);
+}
 
-//=====================================
+//======================================
+
+//===============Expr==================
+
+Assg* newAssg(Sym *sym,Expr *index,Expr *expr) {
+    Assg *newa = (Assg*)malloc(sizeof(Assg));
+    newa->sym = sym;
+    newa->index = index;
+    newa->expr = expr;
+    return newa;
+}
+
+Assg* emptyAssg() {
+    return newAssg(NULL,NULL,NULL);
+}
+
+
+//======================================
+
+
 
 //================SEMANTICS=============================
+
+Assg* createAssg(String s,Expr *index,Expr *expr) {
+    Sym *sym;
+    if ((sym = getValueStringKSymVHashTable(current_scope,&s)) != NULL) { // check local scope
+        if (sym->sym_type == CLIKE_VAR) {
+            return newAssg(sym,index,expr);
+        } else {
+            yyerror("");
+            fprintf(stderr,"\tCOMPILER ERROR how did a function get assigned to local scope??\n");
+        }
+    } else if ((sym = getValueStringKSymVHashTable(global_sym_table,&s)) != NULL) { // check global scope
+        if (sym->sym_type == CLIKE_VAR) {
+            return newAssg(sym,index,expr);
+        } else {
+            yyerror("");
+            fprintf(stderr,"\tcannot assign a value to function <%s>\n",s);
+        }
+    } else { // identifier does not exist
+        yyerror("");
+        fprintf(stderr,"\tidentifier <%s> does not exist\n",s);
+    }
+    return emptyAssg();
+}
 
 
 /* checks the symbol table against the list of function symbols; each function symbol could be a prototype or a function definition */
@@ -187,11 +232,11 @@ void checkMatchingFuncSym(StringKSymVHashTable *table,Sym *new_func_sym,Sym *sym
             fprintf(stderr,"\tduplicate definition of <%s>\n",sym_entry->id);
         } else {// the function grabbed from the table is a prototype
             // prototype was already in the table and now you have a definition -- CORRECT
-            if (sym_entry->type != new_func_sym->type) {
+            if (sym_entry->type != new_func_sym->type) { // prototype and definition return types do not match
                 yyerror("");
                 fprintf(stderr,"\t<%s> function return type does not match prototype\n",sym_entry->id);
-            } else if (compareStringList(sym_entry->args_id_list,new_func_sym->args_id_list) != 0) {
-                yyerror("");
+            } else if (compareStringList(sym_entry->args_id_list,new_func_sym->args_id_list) != 0) { 
+                yyerror(""); // TODO not sure if this is  correct, prototype doesn't have a list of ids for its arguments, just a list of types
                 fprintf(stderr,"\t<%s> function argument list does not match prototype argument list\n",sym_entry->id);
             } else {// if all's good, replace the prototype entry with the function definition
                 freeSym(removeStringKSymVHashTable(table,&sym_entry->id));
@@ -466,10 +511,43 @@ void setScope(StringKSymVHashTable *table) {
     current_scope = table;
 }
 
-Expr* stringToExpr(StringKSymVHashTable *table, String s) {
-    Sym* sym = getValueStringKSymVHashTable(table,&s);
-    if (sym != NULL && sym->sym_type == CLIKE_VAR) return newExpr(sym->type);
-    else return newExpr(VOID);
+Expr* idToExpr(String s,ExprList *expr_list,Expr *expr) {
+    Sym *sym;
+    if (expr_list == NULL && expr != NULL) { // array element accession POSSIBLE_REFACTORING_aetb
+        if ((sym = getValueStringKSymVHashTable(current_scope,&s)) != NULL) { // check local scope
+            return newExpr(sym->type);
+        } else if ((sym = getValueStringKSymVHashTable(global_sym_table,&s)) != NULL) { // check global scope
+            return newExpr(sym->type);
+        } else { // identifier doesn't exist
+            yyerror("");
+            fprintf(stderr,"\tidentifier <%s> does not exist\n",s);
+        }
+    } else if (expr_list != NULL && expr == NULL) { // function call
+        if ((sym = getValueStringKSymVHashTable(global_sym_table,&s)) != NULL) {
+            if (sym->sym_type == CLIKE_FUNC) {
+                return newExpr(sym->type);
+            } else {
+                yyerror("");
+                fprintf(stderr,"\t<%s> is not a function\n",s);
+            }
+        } else {
+            yyerror("");
+            fprintf(stderr,"\tfunction <%s> does not exist\n",s);
+        }
+    } else { // local or global variable accession POSSIBLE_REFACTORING_aetb
+        if ((sym = getValueStringKSymVHashTable(current_scope,&s)) != NULL) { // check local scope
+            return newExpr(sym->type);
+        } else if ((sym = getValueStringKSymVHashTable(global_sym_table,&s)) != NULL) { // check global scope
+            return newExpr(sym->type);
+        } else { // identifier doesn't exist
+            yyerror("");
+            fprintf(stderr,"\tidentifier <%s> does not exist\n",s);
+        }
+    }
+
+    // error occurred, return an empty expression
+    return emptyExpr();
+
 }
 
 

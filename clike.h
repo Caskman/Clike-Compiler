@@ -7,6 +7,8 @@
 #include "clike_types.h"
 #include "stringksymvhashtable.h"
 #include "exprlist_imp.h"
+#include "exprlist.h"
+#include "assglist_imp.h"
 
 void yyerror(char const *s);
 void logg(char const *s);
@@ -39,6 +41,6 @@ void checkAndLogFuncWithSymTable(StringKSymVHashTable *table,Sym *func);
 Expr* newExpr(Type type;);
 Expr* resolveExpr(int operator,Expr *a,Expr *b);
 void setScope(StringKSymVHashTable *table);
-Expr* stringToExpr(StringKSymVHashTable *table, String s);
-
+Expr* idToExpr(String s,ExprList *expr_list,Expr *expr);
+Assg* createAssg(String s,Expr *index,Expr *expr);
 #endif

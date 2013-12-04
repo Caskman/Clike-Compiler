@@ -4,6 +4,7 @@
 	#include "stringlist.h"
 	#include <string.h>
 	#include "exprlist_imp.h"
+	#include "exprlist.h"
 %}
 
 %union {
@@ -15,6 +16,8 @@
 	TypeList *type_list;
 	StringList *string_list;
 	Expr *expr;
+	ExprList *expr_list;
+	Assg *assg;
 }
 
 %token <d> INTEGER
@@ -31,7 +34,9 @@
 %type <sym> f_prot dclr func func_header
 %type <type_list> type_list
 %type <string_list> id_list
-%type <expr> expr
+%type <expr> expr array_index opt_array_index opt_expr
+%type <expr_list> opt_expr_list expr_list
+%type <assg> assg opt_assg
 
 
 %left D_BAR
@@ -65,7 +70,7 @@ opt_stmt:
 	/* epsilon */
 	| stmt
 stmt:
-	WHILE '(' expr ')' opt_stmt
+	WHILE '(' expr ')' opt_stmt 
 	| IF '(' expr ')' stmt else_clause
 	| FOR for_control opt_stmt
 	| ID '(' opt_expr_list ')'
@@ -78,24 +83,24 @@ else_clause:
 	/* epsilon */
 	| ELSE stmt
 opt_assg:
-	/* epsilon */
-	| assg
+	/* epsilon */ {$$ = NULL;}
+	| assg {$$ = $1;}
 assg:
-	ID opt_array_index '=' expr
+	ID opt_array_index '=' expr {$$ = createAssg($1,$2,$4);}
 opt_array_index:
-	/* epsilon */
-	| array_index
+	/* epsilon */ {$$ = NULL;}
+	| array_index {$$ = $1;}
 array_index:
-	'[' expr ']'
+	'[' expr ']' {$$ = $2;}
 opt_expr_list:
-	/* epsilon */
-	| expr_list
+	/* epsilon */ {$$ = newExprList();}
+	| expr_list {$$ = $1;}
 expr_list:
-	expr
-	| expr ',' expr_list
+	expr {$$ = makeSEExprList($1);}
+	| expr ',' expr_list {$$ = appendExpr($3,$1);}
 opt_expr:
-	/* epsilon */
-	| expr
+	/* epsilon */ {$$ = NULL;}
+	| expr {$$ = $1;}
 expr:
     '-' expr %prec UMINUS {$$ = resolveExpr($1,$2,NULL);}
     | '!' expr %prec NOT {$$ = resolveExpr($1,$2,NULL);}
@@ -112,15 +117,11 @@ expr:
     | expr '<' expr {$$ = resolveExpr($2,$1,$3);}
     | expr '>' expr {$$ = resolveExpr($2,$1,$3);}
     | '(' expr ')'  {$$ = $2;}
-	| ID opt_id_decorator {$$ = stringToExpr(current_scope,$1);}
+    | ID {$$ = idToExpr($1,NULL,NULL);}
+	| ID '[' expr ']' {$$ = idToExpr($1,NULL,$3);}
+	| ID '(' opt_expr_list ')' {$$ = idToExpr($1,$3,NULL);}
 	| INTEGER {$$ = newExpr(INT);}
 	| DOUBLE {$$ = newExpr(DOUBLE);}
-opt_id_decorator:
-	/* epsilon */
-	| id_decorator
-id_decorator:
-	'(' opt_expr_list ')'
-	| '[' expr ']'
 opt_loc_dcl_list:
 	/* epsilon */ {$$ = newSymList();}
 	| loc_dcl_list {$$ = $1;}
