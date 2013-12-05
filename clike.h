@@ -44,4 +44,15 @@ Expr* resolveExpr(int operator,Expr *a,Expr *b);
 void setScope(StringKSymVHashTable *table);
 Expr* idToExpr(String s,ExprList *expr_list,Expr *expr);
 Assg* createAssg(String s,Expr *index,Expr *expr);
+Stmt* createListStmt(StmtList *list);
+Stmt* createAssgStmt(Assg *assg);
+Stmt* createReturnStmt(Expr *expr);
+Stmt* createCallStmt(String id,ExprList *arg_list);
+Stmt* createForStmt(Stmt *for_control,Stmt *stmt);
+Stmt* createForControl(Assg *assg1,Expr *expr,Assg *assg2);
+Stmt* createIfStmt(Expr *expr,Stmt *else_clause,Stmt *stmt);
+Stmt* createWhileStmt(Expr *expr,Stmt *stmt);
+Stmt* createElseStmt(Stmt *stmt);
+
+
 #endif

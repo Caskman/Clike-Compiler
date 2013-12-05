@@ -5,10 +5,13 @@
 #define STMT_IF 34
 #define STMT_WHILE 234
 #define STMT_FOR 678
+#define STMT_FORCON 927
 #define STMT_RETURN 654
 #define STMT_ASSG 32
 #define STMT_STMTLIST 84
 #define STMT_FUNCCALL 9283
+#define STMT_ELSE 8274
+#define STMT_EMPTY 2746
 
 #include "exprlist_imp.h"
 #include "exprlist.h"

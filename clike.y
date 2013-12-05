@@ -5,6 +5,7 @@
 	#include <string.h>
 	#include "exprlist_imp.h"
 	#include "exprlist.h"
+	#include "stmtlist.h"
 %}
 
 %union {
@@ -18,6 +19,8 @@
 	Expr *expr;
 	ExprList *expr_list;
 	Assg *assg;
+	Stmt *stmt;
+	StmtList *stmt_list;
 }
 
 %token <d> INTEGER
@@ -37,6 +40,8 @@
 %type <expr> expr array_index opt_array_index opt_expr
 %type <expr_list> opt_expr_list expr_list
 %type <assg> assg opt_assg
+%type <stmt> stmt opt_stmt else_clause for_control
+%type <stmt_list> stmt_list opt_stmt_list
 
 
 %left D_BAR
@@ -61,27 +66,27 @@ prog_element:
 func:
 	func_header opt_loc_dcl_list {current_function = $1; checkAndLogFuncWithSymTable(global_sym_table,$1); reconcileArgsCreateScope($1,$2); setScope(current_function->scope);} '{' opt_loc_dcl_list opt_stmt_list '}' {setScope(global_sym_table);}
 opt_stmt_list:
-	/* epsilon */
-	| stmt_list
+	/* epsilon */ {$$ = newStmtList();}
+	| stmt_list {$$ = $1;}
 stmt_list:
-	stmt ';'
-	| stmt ';' stmt_list
+	stmt ';' {$$ = makeSEStmtList($1);}
+	| stmt ';' stmt_list {$$ = appendStmt($3,$1);}
 opt_stmt:
-	/* epsilon */
-	| stmt
+	/* epsilon */ {$$ = NULL;}
+	| stmt {$$ = $1;}
 stmt:
-	WHILE '(' expr ')' opt_stmt 
-	| IF '(' expr ')' stmt else_clause
-	| FOR for_control opt_stmt
-	| ID '(' opt_expr_list ')'
-	| RETURN opt_expr 
-	| assg
-	| '{' opt_stmt_list '}'
+	WHILE '(' expr ')' opt_stmt {$$ = createWhileStmt($3,$5);}
+	| IF '(' expr ')' stmt else_clause {$$ = createIfStmt($3,$6,$5);}
+	| FOR for_control opt_stmt {$$ = createForStmt($2,$3);}
+	| ID '(' opt_expr_list ')' {$$ = createCallStmt($1,$3);}
+	| RETURN opt_expr {$$ = createReturnStmt($2);}
+	| assg {$$ = createAssgStmt($1);}
+	| '{' opt_stmt_list '}' {$$ = createListStmt($2);}
 for_control:
-	'(' opt_assg ';' opt_expr ';' opt_assg ')'
+	'(' opt_assg ';' opt_expr ';' opt_assg ')' {$$ = createForControl($2,$4,$6);}
 else_clause:
-	/* epsilon */
-	| ELSE stmt
+	/* epsilon */ {$$ = NULL;}
+	| ELSE stmt {$$ = createElseStmt($2);}
 opt_assg:
 	/* epsilon */ {$$ = NULL;}
 	| assg {$$ = $1;}

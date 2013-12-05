@@ -166,6 +166,24 @@ Assg* emptyAssg() {
 
 //===============Stmt==================
 
+Stmt* newStmt(int stmt_type, StmtList *stmt_list,Stmt *else_clause,Stmt *stmt,Expr *expr,Assg *assg,Assg *assg2,Sym *sym,ExprList *expr_list) {
+    Stmt *news = (Stmt*) malloc(sizeof(Stmt*));
+    news->stmt_type = stmt_type;
+    news->stmt_list = stmt_list;
+    news->else_clause = else_clause;
+    news->stmt = stmt;
+    news->expr = expr;
+    news->assg = assg;
+    news->assg2 = assg2;
+    news->sym = sym;
+    news->expr_list = expr_list;
+    return news;
+}
+
+Stmt* emptyStmt() {
+    return newStmt(STMT_EMPTY,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL);
+}
+
 void printStmt(Stmt *data) {
 
 }
@@ -185,6 +203,75 @@ int compareStmt(Stmt *a,Stmt *b) {
 //======================================
 
 //================SEMANTICS=============================
+
+Stmt* createListStmt(StmtList *list) {
+    return newStmt(STMT_STMTLIST,list,NULL,NULL,NULL,NULL,NULL,NULL,NULL);
+}
+
+Stmt* createAssgStmt(Assg *assg) {
+    return newStmt(STMT_ASSG,NULL,NULL,NULL,NULL,assg,NULL,NULL,NULL);
+}
+
+Stmt* createReturnStmt(Expr *expr) {
+    return newStmt(STMT_RETURN,NULL,NULL,NULL,expr,NULL,NULL,NULL,NULL);
+}
+
+int checkArgList(Sym *func,ExprList *arg_list) {
+    ExprNode *enode; TypeNode *tnode; int i;
+    for (i = 1, tnode = func->args_type_list->head->next,enode = arg_list->head->next;
+         tnode != NULL && enode != NULL; tnode = tnode->next,enode = enode->next,i++) {
+        if (*tnode->data != enode->data->type) {
+            yyerror("");
+            fprintf(stderr,"\tmismatched argument type for argument %d\n",i);
+            return 0;
+        }
+    }
+    return 1;
+}
+
+Stmt* createCallStmt(String id,ExprList *arg_list) {
+    Sym *sym;
+    if ((sym = getValueStringKSymVHashTable(global_sym_table,&id)) != NULL) { // check global symbol table
+        if (sym->sym_type == CLIKE_FUNC) { // symbol must be a function
+            if (checkArgList(sym,arg_list)) { // argument types must match function arguments type
+                return newStmt(STMT_FUNCCALL,NULL,NULL,NULL,NULL,NULL,NULL,sym,arg_list);
+            } else {
+                // yyerror("");
+                // fprintf(stderr,"\t\n");
+            }
+        } else {
+            yyerror("");
+            fprintf(stderr,"\t<%s> is not a function\n",id);
+        }
+    } else {
+        yyerror("");
+        fprintf(stderr,"\tfunction <%s> does not exist\n",id);
+    }
+
+    return emptyStmt();
+}
+
+Stmt* createForStmt(Stmt *for_control,Stmt *stmt) {
+    Stmt *new_stmt = newStmt(STMT_FOR,NULL,NULL,stmt,for_control->expr,for_control->assg,for_control->assg2,NULL,NULL);
+    // TODO free(for_control); goes here
+    return new_stmt;
+}
+
+Stmt* createForControl(Assg *assg1,Expr *expr,Assg *assg2) {
+    return newStmt(STMT_FORCON,NULL,NULL,NULL,expr,assg1,assg2,NULL,NULL);
+}
+
+Stmt* createElseStmt(Stmt *stmt) {
+    return newStmt(STMT_ELSE,NULL,NULL,stmt,NULL,NULL,NULL,NULL,NULL);
+}
+
+Stmt* createIfStmt(Expr *expr,Stmt *else_clause,Stmt *stmt) {
+    return newStmt(STMT_IF,NULL,else_clause,stmt,NULL,NULL,NULL,NULL,NULL);
+}
+
+Stmt* createWhileStmt(Expr *expr,Stmt *stmt) {
+    return newStmt(STMT_WHILE,NULL,NULL,stmt,expr,NULL,NULL,NULL,NULL);
+}
 
 Assg* createAssg(String s,Expr *index,Expr *expr) {
     Sym *sym;
@@ -340,6 +427,7 @@ SymList* changeIDListToStringListAndSetType(StringList *id_list,Type type) {
     return setTypesSymList(stringListToSymList(id_list),type);
 }
 
+// Right now, all Strings in the args_id_list are duplicated and used to create a symbol for each arg. 
 void reconcileArgsCreateScope(Sym *func,SymList *decl_list) {
     // SymNode *sym_node;
     StringNode *string_node;
@@ -367,7 +455,7 @@ void reconcileArgsCreateScope(Sym *func,SymList *decl_list) {
         if (arg != NULL) arg->type = sym_node->data->type;
         else {
             yyerror("");
-            fprintf(stderr,"\tparameter type declaration <%s> was not found in the parameter identifier list\n",sym_node->data->id);
+            fprintf(stderr,"\tparameter type declaration <%s> does not exist as an argument\n",sym_node->data->id);
         }
     }
 
