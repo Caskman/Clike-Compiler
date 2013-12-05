@@ -64,7 +64,7 @@ prog_element:
 	dcl ';' {checkSymListForDups($1); checkAndLogSymTable(global_sym_table,$1);}
 	| func 
 func:
-	func_header opt_loc_dcl_list {current_function = $1; checkAndLogFuncWithSymTable(global_sym_table,$1); reconcileArgsCreateScope($1,$2); setScope(current_function->scope);} '{' opt_loc_dcl_list opt_stmt_list '}' {setScope(global_sym_table);}
+	func_header opt_loc_dcl_list {current_function = $1; checkAndLogFuncWithSymTable(global_sym_table,$1); reconcileArgsCreateScope($1,$2); setScope(current_function->scope);} '{' opt_loc_dcl_list {addLocalsToScope($5);} opt_stmt_list '}' {setScope(global_sym_table);}
 opt_stmt_list:
 	/* epsilon */ {$$ = newStmtList();}
 	| stmt_list {$$ = $1;}
@@ -134,7 +134,7 @@ loc_dcl_list:
 	loc_dcl {$$ = $1;}
 	| loc_dcl loc_dcl_list {$$ = appendSymListToList($2,$1);}
 loc_dcl:
-	type id_list ';' {$$ = changeIDListToStringListAndSetType($2,$1);}
+	type id_list ';' {$$ = changeIDListToSymListAndSetType($2,$1);}
 id_list:
 	ID {$$ = makeSEStringListWoP($1);}
 	| ID ',' id_list {$$ = appendStringWoP($3,$1);}

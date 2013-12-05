@@ -33,7 +33,7 @@ int compareString(String *a,String *b) {
 
 String* dupString(String *data) {
     String *s = (String*)malloc(sizeof(String));
-    *s = (char*)malloc(sizeof(char)*strlen(*data));
+    *s = (char*)malloc((sizeof(char)*strlen(*data)) + 1);
     strcpy(*s,*data);
     return s;
 }
@@ -93,6 +93,7 @@ Sym* dupSym(Sym *data) {
     return f;
 }
 
+//==========================================
 
 //===============Type===================
 
@@ -167,7 +168,7 @@ Assg* emptyAssg() {
 //===============Stmt==================
 
 Stmt* newStmt(int stmt_type, StmtList *stmt_list,Stmt *else_clause,Stmt *stmt,Expr *expr,Assg *assg,Assg *assg2,Sym *sym,ExprList *expr_list) {
-    Stmt *news = (Stmt*) malloc(sizeof(Stmt*));
+    Stmt *news = (Stmt*) malloc(sizeof(Stmt));
     news->stmt_type = stmt_type;
     news->stmt_list = stmt_list;
     news->else_clause = else_clause;
@@ -203,6 +204,17 @@ int compareStmt(Stmt *a,Stmt *b) {
 //======================================
 
 //================SEMANTICS=============================
+
+void addLocalsToScope(SymList *symlist) {
+    StringKSymVHashTable *scope = current_scope;
+    SymNode *snode;
+
+    for (snode = symlist->head->next; snode != NULL; snode = snode->next) {
+        putStringKSymVHashTable(scope,dupString(&snode->data->id),snode->data);
+    }
+
+
+}
 
 Stmt* createListStmt(StmtList *list) {
     return newStmt(STMT_STMTLIST,list,NULL,NULL,NULL,NULL,NULL,NULL,NULL);
@@ -423,7 +435,7 @@ SymList* stringListToSymList(StringList *string_list) {
     return sym_list;
 }
 
-SymList* changeIDListToStringListAndSetType(StringList *id_list,Type type) {
+SymList* changeIDListToSymListAndSetType(StringList *id_list,Type type) {
     return setTypesSymList(stringListToSymList(id_list),type);
 }
 

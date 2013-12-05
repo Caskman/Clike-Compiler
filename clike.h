@@ -36,7 +36,7 @@ SymList* setTypesSymList(SymList *list,Type type);
 Sym* newVarDecl(Type type,String id,int array_size);
 Sym* newFunctionHeader(Type type,String id,StringList *id_list);
 void checkFunction(StringKSymVHashTable *table,Sym *function);
-SymList* changeIDListToStringListAndSetType(StringList *id_list,Type type);
+SymList* changeIDListToSymListAndSetType(StringList *id_list,Type type);
 void reconcileArgsCreateScope(Sym *func,SymList *decl_list);
 void checkAndLogFuncWithSymTable(StringKSymVHashTable *table,Sym *func);
 Expr* newExpr(Type type;);
@@ -53,6 +53,6 @@ Stmt* createForControl(Assg *assg1,Expr *expr,Assg *assg2);
 Stmt* createIfStmt(Expr *expr,Stmt *else_clause,Stmt *stmt);
 Stmt* createWhileStmt(Expr *expr,Stmt *stmt);
 Stmt* createElseStmt(Stmt *stmt);
-
+void addLocalsToScope(SymList *symlist);
 
 #endif
