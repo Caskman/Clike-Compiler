@@ -17,6 +17,7 @@ typedef struct sym {
     TypeList *args_type_list;
     StringList *args_id_list;
     StringKSymVHashTable *scope;
+    int array_size;
 } Sym;
 
 void printString(String *data);

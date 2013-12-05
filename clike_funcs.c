@@ -54,7 +54,7 @@ unsigned int hashString(String *key) {
 
 //================Sym================
 
-Sym* newSym(String id,int sym_type,int is_defined,Type type,TypeList *args_type_list,StringList *args_id_list,StringKSymVHashTable *scope) {
+Sym* newSym(String id,int sym_type,int is_defined,Type type,TypeList *args_type_list,StringList *args_id_list,StringKSymVHashTable *scope,int array_size) {
     Sym *f = (Sym*)malloc(sizeof(Sym));
     f->id = id;
     f->sym_type = sym_type;
@@ -63,6 +63,7 @@ Sym* newSym(String id,int sym_type,int is_defined,Type type,TypeList *args_type_
     f->args_type_list = args_type_list;
     f->args_id_list = args_id_list;
     f->scope = scope;
+    f->array_size = array_size;
     return f;
 }
 
@@ -90,6 +91,7 @@ Sym* dupSym(Sym *data) {
     if (data->args_type_list != NULL) f->args_type_list = dupTypeList(data->args_type_list);
     if (data->args_id_list != NULL) f->args_id_list = dupStringList(data->args_id_list);
     f->scope = NULL;
+    f->array_size = data->array_size;
     return f;
 }
 
@@ -212,8 +214,6 @@ void addLocalsToScope(SymList *symlist) {
     for (snode = symlist->head->next; snode != NULL; snode = snode->next) {
         putStringKSymVHashTable(scope,dupString(&snode->data->id),snode->data);
     }
-
-
 }
 
 Stmt* createListStmt(StmtList *list) {
@@ -287,23 +287,41 @@ Stmt* createWhileStmt(Expr *expr,Stmt *stmt) {
 
 Assg* createAssg(String s,Expr *index,Expr *expr) {
     Sym *sym;
-    if ((sym = getValueStringKSymVHashTable(current_scope,&s)) != NULL) { // check local scope
-        if (sym->sym_type == CLIKE_VAR) {
-            return newAssg(sym,index,expr);
-        } else {
+    if ((sym = getValueStringKSymVHashTable(current_scope,&s)) == NULL) {
+        if ((sym = getValueStringKSymVHashTable(global_sym_table,&s)) == NULL) {
             yyerror("");
-            fprintf(stderr,"\tCOMPILER ERROR how did a function get assigned to local scope??\n");
+            fprintf(stderr,"\tidentifier <%s> does not exist\n",s);
         }
-    } else if ((sym = getValueStringKSymVHashTable(global_sym_table,&s)) != NULL) { // check global scope
-        if (sym->sym_type == CLIKE_VAR) {
-            return newAssg(sym,index,expr);
+    }
+
+    if (sym != NULL) {
+        if (sym->sym_type == CLIKE_VAR) {// check that the symbol is a variable
+            if ((index != NULL && sym->array_size != -1) || (index == NULL && sym->array_size == -1)) { // check for array index if needed
+                if ((index != NULL && index->type == INT) || index == NULL) { // check that the index is an integer
+                    if (sym->type == expr->type) {// check that the lhs and rhs types are the same
+                        return newAssg(sym,index,expr);
+                    } else {
+                        yyerror("");
+                        fprintf(stderr,"\ttypes are incompatible for assignment\n");
+                    }
+                } else {
+                    yyerror("");
+                    fprintf(stderr,"\tarray index must evaluate to an integer value\n");
+                }
+                
+            } else {
+                if (index == NULL && sym->array_size != -1) {
+                    yyerror("");
+                    fprintf(stderr,"\tmust provide an array index for variable <%s>\n",s);
+                } else if (index != NULL && sym->array_size == -1) {
+                    yyerror("");
+                    fprintf(stderr,"\tat variable <%s>: cannot index a variable that is not an array\n",s);
+                }
+            }
         } else {
             yyerror("");
             fprintf(stderr,"\tcannot assign a value to function <%s>\n",s);
         }
-    } else { // identifier does not exist
-        yyerror("");
-        fprintf(stderr,"\tidentifier <%s> does not exist\n",s);
     }
     return emptyAssg();
 }
@@ -405,15 +423,15 @@ void checkAndLogFuncWithSymTable(StringKSymVHashTable *table,Sym *func) {
 
 /* construct a Sym object */
 Sym* newFProt(Type type,char *id,TypeList *type_list) {
-    return newSym(id,CLIKE_FUNC,0,type,type_list,NULL,NULL);
+    return newSym(id,CLIKE_FUNC,0,type,type_list,NULL,NULL,-1);
 }
 
 Sym* newVarDecl(Type type,String id,int array_size) {
-    return newSym(id,CLIKE_VAR,1,type,NULL,NULL,NULL);
+    return newSym(id,CLIKE_VAR,1,type,NULL,NULL,NULL,array_size);
 }
 
 Sym* newFunctionHeader(Type type,String id,StringList *id_list) {
-    return newSym(id,CLIKE_FUNC,1,type,NULL,id_list,NULL);
+    return newSym(id,CLIKE_FUNC,1,type,NULL,id_list,NULL,-1);
 }
 
 SymList* setTypesSymList(SymList *list,Type type) {
@@ -429,7 +447,7 @@ SymList* stringListToSymList(StringList *string_list) {
     StringNode *node;
     for (node = string_list->head->next; node != NULL; node = node->next) {
         String *dupstring = dupString(node->data);
-        appendSym(sym_list,newSym(*dupstring,CLIKE_VAR,1,-1,NULL,NULL,NULL));
+        appendSym(sym_list,newSym(*dupstring,CLIKE_VAR,1,-1,NULL,NULL,NULL,-1));
         free(dupstring);
     }
     return sym_list;
@@ -454,7 +472,7 @@ void reconcileArgsCreateScope(Sym *func,SymList *decl_list) {
     // add all of the id parameters to the scope and add them to the parameter list at the same time
     for (string_node = func->args_id_list->head->next; string_node != NULL; string_node = string_node->next) {
         String *dupstring = dupString(string_node->data);
-        Sym *newsym = newSym(*dupstring,CLIKE_VAR,1,-1,NULL,NULL,NULL);
+        Sym *newsym = newSym(*dupstring,CLIKE_VAR,1,-1,NULL,NULL,NULL,-1);
         free(dupstring);
         appendSym(parameters,newsym);
         putStringKSymVHashTable(func->scope,dupString(string_node->data),newsym);
@@ -632,14 +650,35 @@ void setScope(StringKSymVHashTable *table) {
 Expr* idToExpr(String s,ExprList *expr_list,Expr *expr) {
     Sym *sym;
     if (expr_list == NULL && expr != NULL) { // array element accession POSSIBLE_REFACTORING_aetb
-        if ((sym = getValueStringKSymVHashTable(current_scope,&s)) != NULL) { // check local scope
-            return newExpr(sym->type);
-        } else if ((sym = getValueStringKSymVHashTable(global_sym_table,&s)) != NULL) { // check global scope
-            return newExpr(sym->type);
-        } else { // identifier doesn't exist
-            yyerror("");
-            fprintf(stderr,"\tidentifier <%s> does not exist\n",s);
+        if ((sym = getValueStringKSymVHashTable(current_scope,&s)) == NULL) { // check local scope
+            if ((sym = getValueStringKSymVHashTable(global_sym_table,&s)) == NULL) { // check global scope
+                yyerror("");
+                fprintf(stderr,"\tidentifier <%s> does not exist\n",s);
+            }
         }
+
+        if (sym != NULL) {
+            if (sym->array_size != -1) { // should have an array size
+                if (expr->type == INT) {
+                    return newExpr(sym->type);
+                } else {
+                    yyerror("");
+                    fprintf(stderr,"\tat variable <%s>: array index must be an integer\n",s);
+                }
+            } else {
+                yyerror("");
+                fprintf(stderr,"\tvariable <%s> cannot be accessed as an array\n",s);
+            }
+        }
+
+        // if ((sym = getValueStringKSymVHashTable(current_scope,&s)) != NULL) { // check local scope
+        //     return newExpr(sym->type);
+        // } else if ((sym = getValueStringKSymVHashTable(global_sym_table,&s)) != NULL) { // check global scope
+        //     return newExpr(sym->type);
+        // } else { // identifier doesn't exist
+        //     yyerror("");
+        //     fprintf(stderr,"\tidentifier <%s> does not exist\n",s);
+        // }
     } else if (expr_list != NULL && expr == NULL) { // function call
         if ((sym = getValueStringKSymVHashTable(global_sym_table,&s)) != NULL) {
             if (sym->sym_type == CLIKE_FUNC) {
@@ -653,14 +692,30 @@ Expr* idToExpr(String s,ExprList *expr_list,Expr *expr) {
             fprintf(stderr,"\tfunction <%s> does not exist\n",s);
         }
     } else { // local or global variable accession POSSIBLE_REFACTORING_aetb
-        if ((sym = getValueStringKSymVHashTable(current_scope,&s)) != NULL) { // check local scope
-            return newExpr(sym->type);
-        } else if ((sym = getValueStringKSymVHashTable(global_sym_table,&s)) != NULL) { // check global scope
-            return newExpr(sym->type);
-        } else { // identifier doesn't exist
-            yyerror("");
-            fprintf(stderr,"\tidentifier <%s> does not exist\n",s);
+        if ((sym = getValueStringKSymVHashTable(current_scope,&s)) == NULL) { // check local scope
+            if ((sym = getValueStringKSymVHashTable(global_sym_table,&s)) == NULL) { // check global scope
+                yyerror("");
+                fprintf(stderr,"\tidentifier <%s> does not exist\n",s);
+            }
         }
+
+        if (sym != NULL) {
+            if (sym->array_size == -1) { // should not have an array size
+                return newExpr(sym->type);
+            } else {
+                yyerror("");
+                fprintf(stderr,"\tvariable <%s> is missing an array index\n",s);
+            }
+        }
+
+        // if ((sym = getValueStringKSymVHashTable(current_scope,&s)) != NULL) { // check local scope
+        //     return newExpr(sym->type);
+        // } else if ((sym = getValueStringKSymVHashTable(global_sym_table,&s)) != NULL) { // check global scope
+        //     return newExpr(sym->type);
+        // } else { // identifier doesn't exist
+        //     yyerror("");
+        //     fprintf(stderr,"\tidentifier <%s> does not exist\n",s);
+        // }
     }
 
     // error occurred, return an empty expression
