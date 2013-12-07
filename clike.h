@@ -54,5 +54,6 @@ Stmt* createIfStmt(Expr *expr,Stmt *else_clause,Stmt *stmt);
 Stmt* createWhileStmt(Expr *expr,Stmt *stmt);
 Stmt* createElseStmt(Stmt *stmt);
 void addLocalsToScope(SymList *symlist);
-
+char* getTypeString(Type type);
+int checkTypeCompat(int type1,int type2);
 #endif

@@ -47,7 +47,8 @@
 %left D_BAR
 %left D_AMP
 %nonassoc '<' '>' LESS_EQ GREAT_EQ D_EQ NOT_EQ
-%left '+' '-'
+%left BSHFTR BSHFTL
+%left '+' '-' 
 %left '/' '*'
 %right UMINUS NOT
 
@@ -113,6 +114,8 @@ expr:
     | expr '-' expr {$$ = resolveExpr($2,$1,$3);}
     | expr '/' expr {$$ = resolveExpr($2,$1,$3);}
     | expr '*' expr {$$ = resolveExpr($2,$1,$3);}
+    | expr BSHFTR expr {$$ = resolveExpr($2,$1,$3);}
+    | expr BSHFTL expr {$$ = resolveExpr($2,$1,$3);}
     | expr D_AMP expr {$$ = resolveExpr($2,$1,$3);}
     | expr D_EQ expr {$$ = resolveExpr($2,$1,$3);}
     | expr D_BAR expr {$$ = resolveExpr($2,$1,$3);}
@@ -126,7 +129,7 @@ expr:
 	| ID '[' expr ']' {$$ = idToExpr($1,NULL,$3);}
 	| ID '(' opt_expr_list ')' {$$ = idToExpr($1,$3,NULL);}
 	| INTEGER {$$ = newExpr(INT);}
-	| DOUBLE {$$ = newExpr(DOUBLE);}
+	| DOUBLE {$$ = newExpr(DOUBLE_DECL);}
 opt_loc_dcl_list:
 	/* epsilon */ {$$ = newSymList();}
 	| loc_dcl_list {$$ = $1;}

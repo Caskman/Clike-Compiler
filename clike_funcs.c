@@ -246,7 +246,12 @@ Stmt* createCallStmt(String id,ExprList *arg_list) {
     if ((sym = getValueStringKSymVHashTable(global_sym_table,&id)) != NULL) { // check global symbol table
         if (sym->sym_type == CLIKE_FUNC) { // symbol must be a function
             if (checkArgList(sym,arg_list)) { // argument types must match function arguments type
-                return newStmt(STMT_FUNCCALL,NULL,NULL,NULL,NULL,NULL,NULL,sym,arg_list);
+                if (sym->type == VOID) { // type must be void to be a standalone call
+                    return newStmt(STMT_FUNCCALL,NULL,NULL,NULL,NULL,NULL,NULL,sym,arg_list);
+                } else {
+                    yyerror("");
+                    fprintf(stderr, "\tcannot call a non-void function outside of an assignment\n");
+                }
             } else {
                 // yyerror("");
                 // fprintf(stderr,"\t\n");
@@ -264,12 +269,20 @@ Stmt* createCallStmt(String id,ExprList *arg_list) {
 }
 
 Stmt* createForStmt(Stmt *for_control,Stmt *stmt) {
+
     Stmt *new_stmt = newStmt(STMT_FOR,NULL,NULL,stmt,for_control->expr,for_control->assg,for_control->assg2,NULL,NULL);
     // TODO free(for_control); goes here
     return new_stmt;
 }
 
 Stmt* createForControl(Assg *assg1,Expr *expr,Assg *assg2) {
+
+    if (expr->type != BOOL) {
+        expr = newExpr(BOOL);
+        yyerror("");
+        fprintf(stderr,"\tfor expression condition must evaluate to a boolean\n");
+    }
+
     return newStmt(STMT_FORCON,NULL,NULL,NULL,expr,assg1,assg2,NULL,NULL);
 }
 
@@ -298,11 +311,11 @@ Assg* createAssg(String s,Expr *index,Expr *expr) {
         if (sym->sym_type == CLIKE_VAR) {// check that the symbol is a variable
             if ((index != NULL && sym->array_size != -1) || (index == NULL && sym->array_size == -1)) { // check for array index if needed
                 if ((index != NULL && index->type == INT) || index == NULL) { // check that the index is an integer
-                    if (sym->type == expr->type) {// check that the lhs and rhs types are the same
+                    if (checkTypeCompat(sym->type,expr->type)) {// check that the lhs and rhs types are the same
                         return newAssg(sym,index,expr);
                     } else {
                         yyerror("");
-                        fprintf(stderr,"\ttypes are incompatible for assignment\n");
+                        fprintf(stderr,"\ttypes are incompatible for assignment: <%s> and <%s>\n",getTypeString(sym->type),getTypeString(expr->type));
                     }
                 } else {
                     yyerror("");
@@ -326,6 +339,12 @@ Assg* createAssg(String s,Expr *index,Expr *expr) {
     return emptyAssg();
 }
 
+int checkTypeCompat(int type1,int type2) {
+    if (type1 == type2) return 1;
+    else if ((type1 == INT && type2 == CHAR) || (type1 == CHAR && type2 == INT)) return 1;
+    // else if (type1 == DOUBLE_DECL && type2 == INT) return 1;
+    return 0;
+}
 
 /* checks the symbol table against the list of function symbols; each function symbol could be a prototype or a function definition */
 void checkAndLogSymTable(StringKSymVHashTable *table,SymList *list) {
@@ -461,7 +480,7 @@ SymList* changeIDListToSymListAndSetType(StringList *id_list,Type type) {
 void reconcileArgsCreateScope(Sym *func,SymList *decl_list) {
     // SymNode *sym_node;
     StringNode *string_node;
-    SymNode *sym_node;
+    SymNode *sym_node,*sym_node2;
     TypeNode *type_node;
 
     // create function scope
@@ -477,6 +496,24 @@ void reconcileArgsCreateScope(Sym *func,SymList *decl_list) {
         appendSym(parameters,newsym);
         putStringKSymVHashTable(func->scope,dupString(string_node->data),newsym);
     }
+
+    SymList *dups = newSymList();
+    // search the param type decl list for dups and toss extras
+    for (sym_node = decl_list->head->next; sym_node != NULL; sym_node = sym_node->next) {
+        for (sym_node2 = sym_node->next; sym_node2 != NULL; sym_node2 = sym_node2->next) {
+            if (compareSym(sym_node->data,sym_node2->data) == 0) {
+                yyerror("");
+                fprintf(stderr, "\tduplicate local variable declaration\n");
+                appendSym(dups,sym_node2->data);
+            }
+        }
+    }
+    for (sym_node = dups->head->next; sym_node != NULL; sym_node = sym_node->next) {
+        removeSym(decl_list,sym_node->data);
+    }
+
+    freeSymListOnly(dups);
+
 
     // iterate through the parameter type declaration list and update each symbol from the scope table with the type given
     // if a declaration in the type list was not found amongst the parameters, error
@@ -515,6 +552,14 @@ void reconcileArgsCreateScope(Sym *func,SymList *decl_list) {
                 fprintf(stderr,"\ttoo few type declarations\n");
             }
         }
+    } else { // since the type list doesn't exist, create and add it to the symbol
+        // iterate through the id list, grab the corresponding symbol from scope, and add it's type to the list.
+        TypeList *type_list = newTypeList();
+        for (string_node = func->args_id_list->head->next; string_node != NULL; string_node = string_node->next) {
+            Sym *sym = getValueStringKSymVHashTable(func->scope,string_node->data);
+            appendTypeWoP(type_list,sym->type);
+        }
+        func->args_type_list = type_list;
     }
 
 
@@ -558,12 +603,13 @@ char* getOperatorString(int operator) {
 
 char* getTypeString(Type type) {
     char *ret = (char*)malloc(sizeof(char)*12);
+    sprintf(ret,"compiler error");
     switch (type) {
         case INT:
             sprintf(ret,"INT");
             break;
         case DOUBLE_DECL:
-            sprintf(ret,"DOUBLE_DECL");
+            sprintf(ret,"DOUBLE");
             break;
         case FLOAT:
             sprintf(ret,"FLOAT");
@@ -591,28 +637,44 @@ void incompatOpError(int op,Type t) {
 }
 
 Expr* resolveExpr(int operator,Expr *a,Expr *b) {
+    Type eff_a = (a->type == CHAR)?INT:a->type;
+
+    Type eff_b;
+    if (b != NULL) eff_b = (b->type == CHAR)?INT:b->type;
     switch (operator) {
+        case BSHFTR:
+        case BSHFTL:
+            if (eff_a != INT) {
+                incompatOpError(operator,a->type);
+                return newExpr(INT);
+            } else if (eff_b != INT) {
+                incompatOpError(operator,b->type);
+                return newExpr(INT);
+            } else {
+                return newExpr(INT);
+            }
+
+            break;
         case '+':
         case '-':
         case '*':
         case '/':
-            // promote chars, check for DOUBLE, INT, CHAR, take care of unary -  
-            if (a->type != INT && a->type != DOUBLE_DECL && a->type != CHAR) {
+            // check for DOUBLE and INT take care of unary -  
+            if (eff_a != INT && eff_a != DOUBLE_DECL) {
                 incompatOpError(operator,a->type);
                 return newExpr(INT);
-            }
-            if (a->type == CHAR) a->type = INT;
-            if (b == NULL) {
-                if (operator == '-') return newExpr(a->type);
             } else {
-                if (b->type != INT && b->type != DOUBLE_DECL && b->type != CHAR) {
-                    incompatOpError(operator,b->type);
+                if (b == NULL) {
+                    if (operator == '-') return newExpr(eff_a);
+                } else if (eff_b != INT && eff_b != DOUBLE_DECL) {
+                    incompatOpError(operator,a->type);
                     return newExpr(INT);
-                } else if (b->type == CHAR) b->type = INT;
+                }
             }
+
             // types must be the same now
-            if (a->type == b->type) {
-                return newExpr(a->type);
+            if (eff_a == eff_b) {
+                return newExpr(eff_a);
             } else {
                 yyerror("");
                 fprintf(stderr,"\tincompatible operands for operator %s\n",getOperatorString(operator));
@@ -626,25 +688,50 @@ Expr* resolveExpr(int operator,Expr *a,Expr *b) {
         case NOT_EQ:
         case D_AMP:
         case D_BAR:
-            if (a->type == b->type) {
+            if (eff_a == eff_b) {
                 return newExpr(BOOL);
             } else {
                 yyerror("");
-                fprintf(stderr,"\toperands of a boolean expression must be the same type\n");
+                fprintf(stderr,"\toperands of a boolean expression must be the same type: <%s> and <%s>\n",getTypeString(a->type),getTypeString(b->type));
                 return newExpr(BOOL);
             }
         case '!':
-            if (a->type == BOOL) return newExpr(BOOL);
+            if (eff_a == BOOL) return newExpr(BOOL);
             else {
                 incompatOpError(operator,a->type);
                 return newExpr(BOOL);
             }
     }
+    yyerror("");
+    fprintf(stderr,"\tUnknown operator <%c>\n",operator);
     return newExpr(VOID);
 }
 
 void setScope(StringKSymVHashTable *table) {
     current_scope = table;
+}
+
+int checkCallArgs(Sym *func,ExprList *arg_list) {
+    if (func->args_type_list->size > arg_list->size) {
+        yyerror("");
+        fprintf(stderr,"\ttoo few arguments\n");
+        return 0;
+    } else if (func->args_type_list->size < arg_list->size) {
+        yyerror("");
+        fprintf(stderr,"\ttoo many arguments\n");
+        return 0;
+    }
+    TypeNode *tnode; ExprNode *enode;
+    int i;
+    for (tnode = func->args_type_list->head->next, enode = arg_list->head->next, i=0;
+            tnode != NULL && enode != NULL; tnode = tnode->next, enode = enode->next, i++) {
+        if (*tnode->data != enode->data->type) {
+            yyerror("");
+            fprintf(stderr, "\targument %d is type <%s>, must be <%s>\n",arg_list->size-i,getTypeString(enode->data->type),getTypeString(*tnode->data));
+            return 0;
+        }
+    }
+    return 1;
 }
 
 Expr* idToExpr(String s,ExprList *expr_list,Expr *expr) {
@@ -680,9 +767,14 @@ Expr* idToExpr(String s,ExprList *expr_list,Expr *expr) {
         //     fprintf(stderr,"\tidentifier <%s> does not exist\n",s);
         // }
     } else if (expr_list != NULL && expr == NULL) { // function call
-        if ((sym = getValueStringKSymVHashTable(global_sym_table,&s)) != NULL) {
-            if (sym->sym_type == CLIKE_FUNC) {
-                return newExpr(sym->type);
+        if ((sym = getValueStringKSymVHashTable(global_sym_table,&s)) != NULL) { // check global scope
+            if (sym->sym_type == CLIKE_FUNC) { // must be a function
+                if (checkCallArgs(sym,expr_list)) { // check the arguments provided, number and type must match 
+                    return newExpr(sym->type);
+                } else {
+                    // yyerror("");
+                    // fprintf(stderr,"\t\n");
+                }
             } else {
                 yyerror("");
                 fprintf(stderr,"\t<%s> is not a function\n",s);
@@ -736,9 +828,12 @@ void logg(char const *s) {
 		printf("%s\n",s);
 }
 
-
+void printConsts() {
+    printf("INT: %d; DOUBLE: %d, CHAR: %d, VOID: %d\n",INT,DOUBLE_DECL,CHAR,VOID);
+}
 
 int main() {
+    // printConsts();
     global_sym_table = newStringKSymVHashTable(20);
     setScope(global_sym_table);
 	yyparse();
