@@ -432,39 +432,20 @@ void checkAndLogSymTable(StringKSymVHashTable *table,SymList *list) {
 /* Given a new function symbol and a matched existing function symbol entry from the table,
  * checks if the existing entry (prototype) can be updated with the new symbol (definition) */
 void checkMatchingFuncSym(StringKSymVHashTable *table,Sym *new_func_sym,Sym *sym_entry) {
-    if (new_func_sym->is_defined) { // if the current function is not a function prototype TODO this clause will probably never execute
-        if (sym_entry->is_defined) {// the function grabbed from the table is not a prototype
-            // incorrect because you can't define a function twice
-            yyerror("");
-            fprintf(stderr,"\tTHIS SHOULD NOT APPEARduplicate definition of <%s>\n",sym_entry->id);
-        } else {// the function grabbed from the table is a prototype
-            // prototype was already in the table and now you have a definition -- CORRECT
-            if (sym_entry->type != new_func_sym->type) { // prototype and definition return types do not match
-                yyerror("");
-                fprintf(stderr,"\tTHIS SHOULD NOT APPEAR<%s> function return type does not match prototype\n",sym_entry->id);
-            } else if (compareStringList(sym_entry->args_id_list,new_func_sym->args_id_list) != 0) { 
-                yyerror(""); // TODO not sure if this is  correct, prototype doesn't have a list of ids for its arguments, just a list of types
-                fprintf(stderr,"\tTHIS SHOULD NOT APPEAR<%s> function argument list does not match prototype argument list\n",sym_entry->id);
-            } else {// if all's good, replace the prototype entry with the function definition
-                freeSym(removeStringKSymVHashTable(table,&sym_entry->id));
-                putStringKSymVHashTable(table,dupString(&new_func_sym->id),new_func_sym);
-                printf("THIS SHOULD NOT APPEAR\n");
-            }
-        }
-    } else { // if the current function is a function prototype
-        if (sym_entry->is_defined) { // the function grabbed from the table is not a prototype
-            // Function has already been defined
-            yyerror("");
-            fprintf(stderr,"\tfunction <%s> has already been defined\n",new_func_sym->id);
-            // free(message);
-        } else { // the function grabbed from the table is a prototype
-            // Function prototype has already been declared
+    // new_func_sym is always a prototype
 
-            yyerror("");
-            fprintf(stderr,"\tfunction prototype <%s> has already been defined\n",sym_entry->id);
-        }
-        freeSymShallow(new_func_sym);
+    if (sym_entry->is_defined) { // the function grabbed from the table is not a prototype
+        // Function has already been defined
+        yyerror("");
+        fprintf(stderr,"\tfunction <%s> has already been defined\n",new_func_sym->id);
+        // free(message);
+    } else { // the function grabbed from the table is a prototype
+        // Function prototype has already been declared
+
+        yyerror("");
+        fprintf(stderr,"\tfunction prototype <%s> has already been defined\n",sym_entry->id);
     }
+    // freeSymShallow(new_func_sym);
 }
 
 /* checks the list to see if there are any Sym objects with the same id */
