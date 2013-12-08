@@ -8,6 +8,7 @@
 #include "clike.tab.h"
 #include "clike_types.h"
 #include "exprlist_imp.h"
+#include "exprlist.h"
 #include "stmtlist.h"
 
 int line = 1;
@@ -133,28 +134,49 @@ Type* dupType(Type *data) {
 void printExpr(Expr *data) {
 
 }
+
 void freeExpr(Expr *data) {
     if (data == NULL) return;
     free(data);
 }
+
 Expr* dupExpr(Expr *data) {
     if (data == NULL) return NULL;
     Expr *newe = (Expr*)malloc(sizeof(Expr));
     newe->type = data->type;
     return newe;
 }
+
 int compareExpr(Expr *a,Expr *b) {
     return a->type - b->type;
 }
 
-Expr* newExpr(Type type) {
+Expr* newExpr(Type type,int intcon,double doublecon,Sym *sym,Expr *left,Expr *right,int operator,ExprList *arg_list,Expr *index_expr) {
     Expr *newe = (Expr*)malloc(sizeof(Expr));
     newe->type = type;
+    newe->intcon = intcon;
+    newe->doublecon = doublecon;
+    newe->sym = sym;
+    newe->left = left;
+    newe->right = right;
+    newe->operator = operator;
+    newe->arg_list = arg_list;
+    newe->index_expr = index_expr;
     return newe;
 }
 
+void freeExprShallow(Expr *expr) {
+    if (expr != NULL) {
+        freeExprListOnly(expr->arg_list);
+    }
+}
+
+Expr* newExprASTNode(Type type,Expr *left,Expr *right,int operator) {
+    return newExpr(type,-1,0.0,NULL,left,right,operator,NULL,NULL);
+}
+
 Expr* emptyExpr() {
-    return newExpr(VOID);
+    return newExpr(CLIKE_ERROR,-1,0.0,NULL,NULL,NULL,-1,NULL,NULL);
 }
 
 //======================================
@@ -193,7 +215,7 @@ Stmt* newStmt(int stmt_type, StmtList *stmt_list,Stmt *else_clause,Stmt *stmt,Ex
 }
 
 Stmt* emptyStmt() {
-    return newStmt(STMT_EMPTY,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL);
+    return newStmt(CLIKE_ERROR,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL);
 }
 
 void printStmt(Stmt *data) {
@@ -215,6 +237,18 @@ int compareStmt(Stmt *a,Stmt *b) {
 //======================================
 
 //================SEMANTICS=============================
+
+Expr* newIntegerExpr(int value) {
+    return newExpr(INT,value,0.0,NULL,NULL,NULL,-1,NULL,NULL);
+}
+
+Expr* newDoubleExpr(double value) {
+    return newExpr(DOUBLE_DECL,-1,value,NULL,NULL,NULL,-1,NULL,NULL);
+}
+
+Sym* newDummyDeclSym() {
+    return newSym(NULL,CLIKE_DECL,-1,-1,NULL,NULL,NULL,-1);
+}
 
 int hasReturnStmt(StmtList *stmt_list) {
     StmtNode *snode;
@@ -320,7 +354,7 @@ Stmt* createForStmt(Stmt *for_control,Stmt *stmt) {
 Stmt* createForControl(Assg *assg1,Expr *expr,Assg *assg2) {
 
     if (expr->type != BOOL) {
-        expr = newExpr(BOOL);
+        expr = emptyExpr();
         yyerror("");
         fprintf(stderr,"\tfor loop expression condition must evaluate to a boolean\n");
     }
@@ -336,7 +370,7 @@ Stmt* createIfStmt(Expr *expr,Stmt *else_clause,Stmt *stmt) {
     if (expr->type != BOOL) {
         yyerror("");
         fprintf(stderr, "\tconditional must evaluate to a boolean\n");
-        expr = newExpr(BOOL);
+        expr = emptyExpr();
     }
     return newStmt(STMT_IF,NULL,else_clause,stmt,NULL,NULL,NULL,NULL,NULL);
 }
@@ -345,7 +379,7 @@ Stmt* createWhileStmt(Expr *expr,Stmt *stmt) {
     if (expr->type != BOOL) {
         yyerror("");
         fprintf(stderr, "\twhile condition must evaluate to a boolean\n");
-        expr = newExpr(BOOL);
+        expr = emptyExpr();
     }
     return newStmt(STMT_WHILE,NULL,NULL,stmt,expr,NULL,NULL,NULL,NULL);
 }
@@ -445,7 +479,7 @@ void checkMatchingFuncSym(StringKSymVHashTable *table,Sym *new_func_sym,Sym *sym
         yyerror("");
         fprintf(stderr,"\tfunction prototype <%s> has already been defined\n",sym_entry->id);
     }
-    // freeSymShallow(new_func_sym);
+    freeSymShallow(new_func_sym);
 }
 
 /* checks the list to see if there are any Sym objects with the same id */
@@ -710,12 +744,10 @@ Expr* resolveExpr(int operator,Expr *a,Expr *b) {
         case BSHFTL:
             if (eff_a != INT) {
                 incompatOpError(operator,a->type);
-                return newExpr(INT);
             } else if (eff_b != INT) {
                 incompatOpError(operator,b->type);
-                return newExpr(INT);
             } else {
-                return newExpr(INT);
+                return newExprASTNode(INT,a,b,operator);
             }
 
             break;
@@ -726,24 +758,22 @@ Expr* resolveExpr(int operator,Expr *a,Expr *b) {
             // check for DOUBLE and INT take care of unary -  
             if (eff_a != INT && eff_a != DOUBLE_DECL) {
                 incompatOpError(operator,a->type);
-                return newExpr(INT);
             } else {
                 if (b == NULL) {
-                    if (operator == '-') return newExpr(eff_a);
+                    if (operator == '-') return newExprASTNode(eff_a,a,b,operator);
                 } else if (eff_b != INT && eff_b != DOUBLE_DECL) {
                     incompatOpError(operator,a->type);
-                    return newExpr(INT);
                 }
             }
 
             // types must be the same now
             if (eff_a == eff_b) {
-                return newExpr(eff_a);
+                return newExprASTNode(eff_a,a,b,operator);
             } else {
                 yyerror("");
                 fprintf(stderr,"\tincompatible operands for operator %s\n",getOperatorString(operator));
-                return newExpr(INT);
             }
+            break;
         case GREAT_EQ:
         case LESS_EQ:
         case '>':
@@ -753,22 +783,28 @@ Expr* resolveExpr(int operator,Expr *a,Expr *b) {
         case D_AMP:
         case D_BAR:
             if (eff_a == eff_b) {
-                return newExpr(BOOL);
+                return newExprASTNode(BOOL,a,b,operator);
             } else {
                 yyerror("");
                 fprintf(stderr,"\toperands of a boolean expression must be the same type: <%s> and <%s>\n",getTypeString(a->type),getTypeString(b->type));
-                return newExpr(BOOL);
             }
+            break;
         case '!':
-            if (eff_a == BOOL) return newExpr(BOOL);
+            if (eff_a == BOOL) return newExprASTNode(BOOL,a,b,operator);
             else {
                 incompatOpError(operator,a->type);
-                return newExpr(BOOL);
             }
+            break;
+        default:
+            yyerror("");
+            fprintf(stderr,"\tUnknown operator <%c>\n",operator);
+            break;
     }
-    yyerror("");
-    fprintf(stderr,"\tUnknown operator <%c>\n",operator);
-    return newExpr(VOID);
+    // yyerror("");
+    // fprintf(stderr,"\tUnknown operator <%c>\n",operator);
+    freeExprShallow(a);
+    freeExprShallow(b);
+    return emptyExpr();
 }
 
 void setScope(StringKSymVHashTable *table) {
@@ -810,7 +846,7 @@ Expr* idToExpr(String s,ExprList *expr_list,Expr *expr) {
         if (sym != NULL) {
             if (sym->array_size != -1) { // should have an array size
                 if (expr->type == INT) {
-                    return newExpr(sym->type);
+                    return newExpr(sym->type,-1,0.0,sym,NULL,NULL,-1,NULL,expr);
                 } else {
                     yyerror("");
                     fprintf(stderr,"\tat variable <%s>: array index must be an integer\n",s);
@@ -825,7 +861,7 @@ Expr* idToExpr(String s,ExprList *expr_list,Expr *expr) {
             if (sym->sym_type == CLIKE_FUNC) { // must be a function
                 if (sym->type != VOID) { // function calls shouldn't return void
                     if (checkCallArgs(sym,expr_list)) { // check the arguments provided, number and type must match 
-                        return newExpr(sym->type);
+                        return newExpr(sym->type,-1,0.0,sym,NULL,NULL,-1,expr_list,NULL);
                     } else {
                         // yyerror("");
                         // fprintf(stderr,"\t\n");
@@ -852,7 +888,7 @@ Expr* idToExpr(String s,ExprList *expr_list,Expr *expr) {
 
         if (sym != NULL) {
             if (sym->array_size == -1) { // should not have an array size
-                return newExpr(sym->type);
+                return newExpr(sym->type,-1,0.0,sym,NULL,NULL,-1,NULL,NULL);
             } else {
                 yyerror("");
                 fprintf(stderr,"\tvariable <%s> is missing an array index\n",s);
@@ -862,7 +898,10 @@ Expr* idToExpr(String s,ExprList *expr_list,Expr *expr) {
     }
 
     // error occurred, return an empty expression
+    ExprNode *enode;
+    for (enode = expr_list->head->next; enode != NULL; enode = enode->next) freeExprShallow(enode->data);
     freeExprListOnly(expr_list);
+    freeExprShallow(expr);
     return emptyExpr();
 
 }

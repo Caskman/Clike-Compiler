@@ -42,6 +42,8 @@
 %type <assg> assg opt_assg
 %type <stmt> stmt opt_stmt else_clause for_control
 %type <stmt_list> stmt_list opt_stmt_list
+%type <sym_list> prog_element_list opt_prog_element_list
+%type <sym> prog_element
 
 
 %left D_BAR
@@ -56,14 +58,14 @@
 
 %%
 opt_prog_element_list: 
-	/* epsilon */
-	| prog_element_list
+	/* epsilon */ 
+	| prog_element_list 
 prog_element_list:
-	prog_element
-	| prog_element prog_element_list
+	prog_element {$$ = makeSESymList($1);}
+	| prog_element prog_element_list {$$ = appendSym($2,$1);}
 prog_element:
-	dcl ';' {checkSymListForDups($1); checkAndLogSymTable(global_sym_table,$1);}
-	| func 
+	dcl ';' {checkSymListForDups($1); checkAndLogSymTable(global_sym_table,$1); $$ = newDummyDeclSym();}
+	| func {$$ = $1;}
 func:
 	func_header opt_loc_dcl_list {current_function = checkAndLogFuncWithSymTable(global_sym_table,$1); reconcileArgsCreateScope(current_function,$2); setScope(current_function->scope);} '{' opt_loc_dcl_list {addLocalsToScope($5);} opt_stmt_list '}' {finalizeFunction(current_function,$7); cleanUpScope();}
 opt_stmt_list:
@@ -128,8 +130,8 @@ expr:
     | ID {$$ = idToExpr($1,NULL,NULL);}
 	| ID '[' expr ']' {$$ = idToExpr($1,NULL,$3);}
 	| ID '(' opt_expr_list ')' {$$ = idToExpr($1,$3,NULL);}
-	| INTEGER {$$ = newExpr(INT);}
-	| DOUBLE {$$ = newExpr(DOUBLE_DECL);}
+	| INTEGER {$$ = newIntegerExpr($1);}
+	| DOUBLE {$$ = newDoubleExpr($1);}
 opt_loc_dcl_list:
 	/* epsilon */ {$$ = newSymList();}
 	| loc_dcl_list {$$ = $1;}

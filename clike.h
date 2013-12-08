@@ -39,7 +39,7 @@ Sym* newFunctionHeader(Type type,String id,StringList *id_list);
 SymList* changeIDListToSymListAndSetType(StringList *id_list,Type type);
 void reconcileArgsCreateScope(Sym *func,SymList *decl_list);
 Sym* checkAndLogFuncWithSymTable(StringKSymVHashTable *table,Sym *func);
-Expr* newExpr(Type type);
+Expr* newExpr(Type type,int intcon,double doublecon,Sym *sym,Expr *left,Expr *right,int operator,ExprList *arg_list,Expr *index_expr);
 Expr* resolveExpr(int operator,Expr *a,Expr *b);
 void setScope(StringKSymVHashTable *table);
 Expr* idToExpr(String s,ExprList *expr_list,Expr *expr);
@@ -60,5 +60,8 @@ void cleanUpScope();
 int checkCallArgs(Sym *func,ExprList *arg_list);
 void finalizeFunction(Sym *func,StmtList *stmt_list);
 int hasReturnStmt(StmtList *stmt_list);
+Sym* newDummyDeclSym();
+Expr* newIntegerExpr(int value);
+Expr* newDoubleExpr(double value);
 
 #endif
