@@ -65,7 +65,7 @@ prog_element:
 	dcl ';' {checkSymListForDups($1); checkAndLogSymTable(global_sym_table,$1);}
 	| func 
 func:
-	func_header opt_loc_dcl_list {current_function = $1; checkAndLogFuncWithSymTable(global_sym_table,$1); reconcileArgsCreateScope($1,$2); setScope(current_function->scope);} '{' opt_loc_dcl_list {addLocalsToScope($5);} opt_stmt_list '}' {setScope(global_sym_table);}
+	func_header opt_loc_dcl_list {current_function = checkAndLogFuncWithSymTable(global_sym_table,$1); reconcileArgsCreateScope(current_function,$2); setScope(current_function->scope);} '{' opt_loc_dcl_list {addLocalsToScope($5);} opt_stmt_list '}' {cleanUpScope();}
 opt_stmt_list:
 	/* epsilon */ {$$ = newStmtList();}
 	| stmt_list {$$ = $1;}
@@ -143,14 +143,14 @@ id_list:
 	| ID ',' id_list {$$ = appendStringWoP($3,$1);}
 func_header:
 	ID '(' ')' {$$ = newFunctionHeader(INT,$1,newStringList());}
-	| VOID ID '(' ')' {$$ = newFunctionHeader($1,$2,newStringList());}
+	| VOID ID '(' ')' {$$ = newFunctionHeader(VOID,$2,newStringList());}
 	| type ID '(' ')' {$$ = newFunctionHeader($1,$2,newStringList());}
 	| ID '(' id_list ')' {$$ = newFunctionHeader(INT,$1,$3);}
-	| VOID ID '(' id_list ')' {$$ = newFunctionHeader($1,$2,$4);}
+	| VOID ID '(' id_list ')' {$$ = newFunctionHeader(VOID,$2,$4);}
 	| type ID '(' id_list ')' {$$ = newFunctionHeader($1,$2,$4);}
 dcl:
 	type dclr_list {$$ = setTypesSymList($2,$1);}
-	| VOID f_prot_list {$$ = setTypesSymList($2,$1);}
+	| VOID f_prot_list {$$ = setTypesSymList($2,VOID);}
 dclr_list:
 	dclr {$$ = makeSESymList($1);}
 	| dclr ',' dclr_list {$$ = appendSym($3,$1);}

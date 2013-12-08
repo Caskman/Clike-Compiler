@@ -38,8 +38,8 @@ Sym* newFunctionHeader(Type type,String id,StringList *id_list);
 void checkFunction(StringKSymVHashTable *table,Sym *function);
 SymList* changeIDListToSymListAndSetType(StringList *id_list,Type type);
 void reconcileArgsCreateScope(Sym *func,SymList *decl_list);
-void checkAndLogFuncWithSymTable(StringKSymVHashTable *table,Sym *func);
-Expr* newExpr(Type type;);
+Sym* checkAndLogFuncWithSymTable(StringKSymVHashTable *table,Sym *func);
+Expr* newExpr(Type type);
 Expr* resolveExpr(int operator,Expr *a,Expr *b);
 void setScope(StringKSymVHashTable *table);
 Expr* idToExpr(String s,ExprList *expr_list,Expr *expr);
@@ -56,4 +56,7 @@ Stmt* createElseStmt(Stmt *stmt);
 void addLocalsToScope(SymList *symlist);
 char* getTypeString(Type type);
 int checkTypeCompat(int type1,int type2);
+void cleanUpScope();
+int checkCallArgs(Sym *func,ExprList *arg_list);
+
 #endif
