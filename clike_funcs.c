@@ -14,7 +14,6 @@ int line = 1;
 int inComments = 0;
 int is_duplicate_function = 0;
 Sym *current_function;
-// Type current_type = -1;
 StringKSymVHashTable *current_scope;
 StringKSymVHashTable *global_sym_table;
 
@@ -315,7 +314,6 @@ Stmt* createCallStmt(String id,ExprList *arg_list) {
 Stmt* createForStmt(Stmt *for_control,Stmt *stmt) {
 
     Stmt *new_stmt = newStmt(STMT_FOR,NULL,NULL,stmt,for_control->expr,for_control->assg,for_control->assg2,NULL,NULL);
-    // TODO free(for_control); goes here
     return new_stmt;
 }
 
@@ -482,11 +480,11 @@ void checkSymListForDups(SymList *list) {
     }
 }
 
-void checkFunction(StringKSymVHashTable *table,Sym *function) { // TODO this function never seems to be used
-    SymList *list= makeSESymList(function);
-    checkAndLogSymTable(table,list);
-    freeSymListOnly(list);
-}
+// void checkFunction(StringKSymVHashTable *table,Sym *function) { // TODO this function never seems to be used
+//     SymList *list= makeSESymList(function);
+//     checkAndLogSymTable(table,list);
+//     freeSymListOnly(list);
+// }
 
 Sym* checkAndLogFuncWithSymTable(StringKSymVHashTable *table,Sym *func) {
     Sym *prototype = getValueStringKSymVHashTable(table,&func->id);

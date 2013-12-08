@@ -35,7 +35,7 @@ Sym* newFProt(Type type,char *id,TypeList *type_list);
 SymList* setTypesSymList(SymList *list,Type type);
 Sym* newVarDecl(Type type,String id,int array_size);
 Sym* newFunctionHeader(Type type,String id,StringList *id_list);
-void checkFunction(StringKSymVHashTable *table,Sym *function);
+// void checkFunction(StringKSymVHashTable *table,Sym *function);
 SymList* changeIDListToSymListAndSetType(StringList *id_list,Type type);
 void reconcileArgsCreateScope(Sym *func,SymList *decl_list);
 Sym* checkAndLogFuncWithSymTable(StringKSymVHashTable *table,Sym *func);
