@@ -8,6 +8,7 @@
 #include "typelist.h"
 
 typedef struct string_k_sym_v_hash_table StringKSymVHashTable;
+typedef struct stmt_list StmtList;
 
 typedef struct sym {
     int sym_type;
@@ -18,6 +19,7 @@ typedef struct sym {
     StringList *args_id_list;
     StringKSymVHashTable *scope;
     int array_size;
+    StmtList *body;
 } Sym;
 
 void printString(String *data);

@@ -58,5 +58,7 @@ char* getTypeString(Type type);
 int checkTypeCompat(int type1,int type2);
 void cleanUpScope();
 int checkCallArgs(Sym *func,ExprList *arg_list);
+void finalizeFunction(Sym *func,StmtList *stmt_list);
+int hasReturnStmt(StmtList *stmt_list);
 
 #endif

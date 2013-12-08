@@ -65,7 +65,7 @@ prog_element:
 	dcl ';' {checkSymListForDups($1); checkAndLogSymTable(global_sym_table,$1);}
 	| func 
 func:
-	func_header opt_loc_dcl_list {current_function = checkAndLogFuncWithSymTable(global_sym_table,$1); reconcileArgsCreateScope(current_function,$2); setScope(current_function->scope);} '{' opt_loc_dcl_list {addLocalsToScope($5);} opt_stmt_list '}' {cleanUpScope();}
+	func_header opt_loc_dcl_list {current_function = checkAndLogFuncWithSymTable(global_sym_table,$1); reconcileArgsCreateScope(current_function,$2); setScope(current_function->scope);} '{' opt_loc_dcl_list {addLocalsToScope($5);} opt_stmt_list '}' {finalizeFunction(current_function,$7); cleanUpScope();}
 opt_stmt_list:
 	/* epsilon */ {$$ = newStmtList();}
 	| stmt_list {$$ = $1;}

@@ -8,6 +8,7 @@
 #include "clike.tab.h"
 #include "clike_types.h"
 #include "exprlist_imp.h"
+#include "stmtlist.h"
 
 int line = 1;
 int inComments = 0;
@@ -96,10 +97,11 @@ Sym* dupSym(Sym *data) { // TODO doesn't seem to used ever
     f->sym_type = data->sym_type;
     f->is_defined = data->is_defined;
     f->type = data->type;
-    if (data->args_type_list != NULL) f->args_type_list = dupTypeList(data->args_type_list);
-    if (data->args_id_list != NULL) f->args_id_list = dupStringList(data->args_id_list);
+    if (data->args_type_list != NULL) f->args_type_list = dupTypeListShallow(data->args_type_list);
+    if (data->args_id_list != NULL) f->args_id_list = dupStringListShallow(data->args_id_list);
     f->scope = NULL;
     f->array_size = data->array_size;
+    if (data->body != NULL) f->body = dupStmtListShallow(data->body);
     return f;
 }
 
@@ -215,6 +217,30 @@ int compareStmt(Stmt *a,Stmt *b) {
 
 //================SEMANTICS=============================
 
+int hasReturnStmt(StmtList *stmt_list) {
+    StmtNode *snode;
+    for (snode = stmt_list->head->next; snode != NULL; snode = snode->next) {
+        switch (snode->data->stmt_type) {
+        case STMT_STMTLIST:
+            if (hasReturnStmt(snode->data->stmt_list)) return 1;
+            break;
+        case STMT_RETURN:
+            return 1;
+            break;
+        }
+    }
+    return 0;
+}
+
+void finalizeFunction(Sym *func,StmtList *stmt_list) {
+    if ((func->type != VOID && hasReturnStmt(stmt_list)) || func->type == VOID) {
+        func->body = stmt_list;
+    } else {
+        yyerror("");
+        fprintf(stderr, "\tnon-void function <%s> must have a return\n",func->id);
+    }
+}
+
 void addLocalsToScope(SymList *symlist) {
     StringKSymVHashTable *scope = current_scope;
     SymNode *snode;
@@ -238,6 +264,10 @@ Stmt* createAssgStmt(Assg *assg) {
 }
 
 Stmt* createReturnStmt(Expr *expr) {
+    if (expr != NULL && !checkTypeCompat(expr->type,current_function->type)) {
+        yyerror("");
+        fprintf(stderr, "\texpression type <%s> does not match function return type <%s>\n",getTypeString(expr->type),getTypeString(current_function->type));
+    }
     return newStmt(STMT_RETURN,NULL,NULL,NULL,expr,NULL,NULL,NULL,NULL);
 }
 
@@ -314,6 +344,11 @@ Stmt* createIfStmt(Expr *expr,Stmt *else_clause,Stmt *stmt) {
 }
 
 Stmt* createWhileStmt(Expr *expr,Stmt *stmt) {
+    if (expr->type != BOOL) {
+        yyerror("");
+        fprintf(stderr, "\twhile condition must evaluate to a boolean\n");
+        expr = newExpr(BOOL);
+    }
     return newStmt(STMT_WHILE,NULL,NULL,stmt,expr,NULL,NULL,NULL,NULL);
 }
 
@@ -809,11 +844,16 @@ Expr* idToExpr(String s,ExprList *expr_list,Expr *expr) {
     } else if (expr_list != NULL && expr == NULL) { // function call
         if ((sym = getValueStringKSymVHashTable(global_sym_table,&s)) != NULL) { // check global scope
             if (sym->sym_type == CLIKE_FUNC) { // must be a function
-                if (checkCallArgs(sym,expr_list)) { // check the arguments provided, number and type must match 
-                    return newExpr(sym->type);
+                if (sym->type != VOID) { // function calls shouldn't return void
+                    if (checkCallArgs(sym,expr_list)) { // check the arguments provided, number and type must match 
+                        return newExpr(sym->type);
+                    } else {
+                        // yyerror("");
+                        // fprintf(stderr,"\t\n");
+                    }
                 } else {
-                    // yyerror("");
-                    // fprintf(stderr,"\t\n");
+                    yyerror("");
+                    fprintf(stderr, "\tfunction <%s> has void return\n",sym->id);
                 }
             } else {
                 yyerror("");
