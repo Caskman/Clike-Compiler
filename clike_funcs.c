@@ -510,8 +510,8 @@ QuadList* generateExprQuadList(Expr *expr,Sym *func,int *locals_bytes,StringKStr
             left = generateFuncCallQuadList(expr->sym,expr->arg_list,func,locals_bytes,labels);
             l_result = getValueDest(left);
             appendQuadListToListShallow(list,left); // call function
-            tempdest = getTempSym(func->scope,locals_bytes,expr->sym->type); // get temp
-            appendQuad(list,newQuad(QUAD_MV,tempdest,l_result,NULL,NULL,-1,-1,0.0)); // move result
+            // tempdest = getTempSym(func->scope,locals_bytes,expr->sym->type); // get temp
+            // appendQuad(list,newQuad(QUAD_MV,tempdest,l_result,NULL,NULL,-1,-1,0.0)); // move result
             // ExprNode *enode; QuadList *elist; int i;
             // for (i = 0, enode = expr->arg_list->head->next; enode != NULL; i++, enode = enode->next) {
             //     elist = generateExprQuadList(enode->data,func,locals_bytes,labels);
@@ -759,7 +759,9 @@ QuadList* generateFuncQuadList(Sym *func,StringKStringVHashTable *labels) {
     prependQuad(stmt_quads,newQuad(QUAD_ENTER,NULL,NULL,NULL,NULL,-1,locals_bytes,0.0));
     prependQuad(stmt_quads,newQuad(QUAD_LABEL,NULL,NULL,NULL,*label,-1,-1,0.0));
 
-    // TODO still need to add leave and return and add label to label table
+    // TODO still need to add leave and return
+
+    appendQuad(stmt_quads,newQuad(QUAD_RETURN,NULL,NULL,NULL,NULL,-1,-1,0.0));
 
     return stmt_quads;
 }
