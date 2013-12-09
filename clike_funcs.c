@@ -64,7 +64,7 @@ unsigned int hashString(String *key) {
 
 //================Sym================
 
-Sym* newSym(String id,int sym_type,int is_defined,Type type,TypeList *args_type_list,StringList *args_id_list,StringKSymVHashTable *scope,int array_size) {
+Sym* newSym(String id,int sym_type,int is_defined,Type type,TypeList *args_type_list,StringList *args_id_list,StringKSymVHashTable *scope,int array_size,StmtList *body) {
     Sym *f = (Sym*)malloc(sizeof(Sym));
     f->id = id;
     f->sym_type = sym_type;
@@ -74,6 +74,7 @@ Sym* newSym(String id,int sym_type,int is_defined,Type type,TypeList *args_type_
     f->args_id_list = args_id_list;
     f->scope = scope;
     f->array_size = array_size;
+    f->body = body;
     return f;
 }
 
@@ -378,10 +379,10 @@ Sym* getTempSym(StringKSymVHashTable *scope,int *locals_bytes,Type type) {
     int i; String name;
     for (i = 0; ; i++) {
         name = toStr(i);
-        if (getValueStringKSymVHashTable(scope,name) == NULL) {
-            Sym *news = newSym(name,CLIKE_VAR,1,type,NULL,NULL,NULL,-1);
+        if (getValueStringKSymVHashTable(scope,&name) == NULL) {
+            Sym *news = newSym(name,CLIKE_VAR,1,type,NULL,NULL,NULL,-1,NULL);
             (*locals_bytes) += getSymBytes(news);
-            putStringKSymVHashTable(scope,dupString(name),news);
+            putStringKSymVHashTable(scope,dupString(&name),news);
             return news;
         }
         free(name);
@@ -398,9 +399,9 @@ Quad* getLabel(String func_name,StringKStringVHashTable *labels,String content) 
         strcpy(s,func_name);
         strcat(s,content);
         strcat(s,suffix);
-        if (getValueStringKStringVHashTable(labels,s) == NULL) {
+        if (getValueStringKStringVHashTable(labels,&s) == NULL) {
             Quad *q = newQuad(QUAD_LABEL,NULL,NULL,NULL,s,-1,-1,0.0);
-            String *t = (String*)malloc(sizeof(String)):
+            String *t = (String*)malloc(sizeof(String));
             *t = s;
             putStringKStringVHashTable(labels,dupString(t),t);
             return q;
@@ -419,7 +420,7 @@ QuadList* generateExprQuadList(Expr *expr,Sym *func,int *locals_bytes,StringKStr
     left = generateExprQuadList(expr->left,func,locals_bytes,labels);
     right = generateExprQuadList(expr->right,func,locals_bytes,labels);
 
-    Sym *l_result,*r_result,*index_result,*tempdest,*result;
+    Sym *l_result,*r_result,*index_result,*tempdest;
 
     l_result = getValueDest(left);
     r_result = getValueDest(right);
@@ -466,7 +467,7 @@ QuadList* generateExprQuadList(Expr *expr,Sym *func,int *locals_bytes,StringKStr
         appendQuadListToListShallow(list,right); // eval right
         appendQuad(list,newQuad(QUAD_BRANCH,NULL,r_result,NULL,label->string,D_EQ,0,0.0)); // branch to false if false
         appendQuad(list,newQuad(QUAD_INIT_INT,tempdest,NULL,NULL,NULL,-1,1,0.0)); // set result to be true
-        appendQuad(list,newQuad(QUAD_GOTO,NULL,NULL,NULL,label2,-1,-1,0.0)); // goto endand
+        appendQuad(list,newQuad(QUAD_GOTO,NULL,NULL,NULL,label2->string,-1,-1,0.0)); // goto endand
         appendQuad(list,label); // add false label
         appendQuad(list,newQuad(QUAD_INIT_INT,tempdest,NULL,NULL,NULL,-1,0,0.0)); // set result to be false
         appendQuad(list,label2); // add endand label
@@ -480,7 +481,7 @@ QuadList* generateExprQuadList(Expr *expr,Sym *func,int *locals_bytes,StringKStr
         appendQuadListToListShallow(list,right); // eval right
         appendQuad(list,newQuad(QUAD_BRANCH,NULL,r_result,NULL,label->string,D_EQ,1,0.0)); // branch to true if true
         appendQuad(list,newQuad(QUAD_INIT_INT,tempdest,NULL,NULL,NULL,-1,0,0.0)); // set result to be false
-        appendQuad(list,newQuad(QUAD_GOTO,NULL,NULL,NULL,label2,-1,-1,0.0)); // goto endor
+        appendQuad(list,newQuad(QUAD_GOTO,NULL,NULL,NULL,label2->string,-1,-1,0.0)); // goto endor
         appendQuad(list,label); // add true label
         appendQuad(list,newQuad(QUAD_INIT_INT,tempdest,NULL,NULL,NULL,-1,1,0.0)); // set result to be true
         appendQuad(list,label2); // add endor label
@@ -498,7 +499,7 @@ QuadList* generateExprQuadList(Expr *expr,Sym *func,int *locals_bytes,StringKStr
             appendQuadListToListShallow(list,index); // eval index expr
             appendQuad(list,newQuad(QUAD_INDX_R,tempdest,expr->sym,index_result,NULL,-1,-1,0.0)); // add index accession
         } else if (expr->sym != NULL && expr->index_expr == NULL && expr->arg_list != NULL) { // func call
-            left = generateFuncCallQuadList(expr->sym,expr->expr->arg_list,Sym *func,int *locals_bytes,StringKStringVHashTable *labels);
+            left = generateFuncCallQuadList(expr->sym,expr->arg_list,func,locals_bytes,labels);
             l_result = getValueDest(left);
             appendQuadListToListShallow(list,left); // call function
             tempdest = getTempSym(func->scope,locals_bytes,expr->sym->type); // get temp
@@ -516,7 +517,7 @@ QuadList* generateExprQuadList(Expr *expr,Sym *func,int *locals_bytes,StringKStr
             // tempdest = getTempSym(func->scope,locals_bytes,sym->type); // create temp
             // appendQuad(list,newQuad(QUAD_RETRIEVE,tempdest,NULL,NULL,NULL,-1,-1,0.0)); // retrieve return value
         } else if (expr->sym != NULL && expr->index_expr == NULL && expr->arg_list == NULL) { // variable
-            tempdest = getTempSym(func->scope,locals_bytes,sym->type); // create temp
+            tempdest = getTempSym(func->scope,locals_bytes,expr->sym->type); // create temp
             appendQuad(list,newQuad(QUAD_MV,tempdest,expr->sym,NULL,NULL,-1,-1,0.0)); // move contents
         } else if (expr->type == INT) {
             tempdest = getTempSym(func->scope,locals_bytes,INT); // create temp
@@ -546,7 +547,7 @@ QuadList* generateFuncCallQuadList(Sym *callee,ExprList *arg_list,Sym *func,int 
     if (callee == NULL) return newQuadList();
     QuadList *list = newQuadList(),*parameter_quad;
     QuadListList *parameter_quads = newQuadListList();
-    ExprNode *enode; QuadListNode *qnode; int i; Sym *result
+    ExprNode *enode; QuadListNode *qnode; int i; Sym *result,*tempdest;
 
     // evaluate each parameter
     for (enode = arg_list->head->next; enode != NULL; enode = enode->next) {
@@ -586,7 +587,7 @@ QuadList* generateFuncCallQuadList(Sym *callee,ExprList *arg_list,Sym *func,int 
 
 QuadList* generateAssgStmtQuadList(Assg *assg,Sym *func,int *locals_bytes,StringKStringVHashTable *labels) {
     if (assg == NULL) return newQuadList();
-    QuadList *list = newQuadList(),*index,*rhs; Sym *rhs_result,index_result,*tempdest;
+    QuadList *list = newQuadList(),*index,*rhs; Sym *rhs_result,*index_result;
 
     index = generateExprQuadList(assg->index,func,locals_bytes,labels);
     rhs = generateExprQuadList(assg->expr,func,locals_bytes,labels);
@@ -748,7 +749,7 @@ QuadList* generateFuncQuadList(Sym *func,StringKStringVHashTable *labels) {
     QuadList *stmt_quads = generateStmtListQuadList(func->body,func,&locals_bytes,labels);
 
     prependQuad(stmt_quads,newQuad(QUAD_ENTER,NULL,NULL,NULL,NULL,-1,locals_bytes,0.0));
-    prependQuad(stmt_quads,newQuad(QUAD_LABEL,NULL,NULL,NULL,label,-1,-1,0.0));
+    prependQuad(stmt_quads,newQuad(QUAD_LABEL,NULL,NULL,NULL,*label,-1,-1,0.0));
 
     // TODO still need to add leave and return and add label to label table
 
@@ -786,7 +787,7 @@ Expr* newDoubleExpr(double value) {
 }
 
 Sym* newDummyDeclSym() {
-    return newSym(NULL,CLIKE_DECL,-1,-1,NULL,NULL,NULL,-1);
+    return newSym(NULL,CLIKE_DECL,-1,-1,NULL,NULL,NULL,-1,NULL);
 }
 
 int hasReturnStmt(StmtList *stmt_list) {
@@ -1079,15 +1080,15 @@ void cleanUpScope() {
 
 /* construct a Sym object */
 Sym* newFProt(Type type,char *id,TypeList *type_list) {
-    return newSym(id,CLIKE_FUNC,0,type,type_list,NULL,NULL,-1);
+    return newSym(id,CLIKE_FUNC,0,type,type_list,NULL,NULL,-1,NULL);
 }
 
 Sym* newVarDecl(Type type,String id,int array_size) {
-    return newSym(id,CLIKE_VAR,1,type,NULL,NULL,NULL,array_size);
+    return newSym(id,CLIKE_VAR,1,type,NULL,NULL,NULL,array_size,NULL);
 }
 
 Sym* newFunctionHeader(Type type,String id,StringList *id_list) {
-    return newSym(id,CLIKE_FUNC,1,type,NULL,id_list,NULL,-1);
+    return newSym(id,CLIKE_FUNC,1,type,NULL,id_list,NULL,-1,NULL);
 }
 
 SymList* setTypesSymList(SymList *list,Type type) {
@@ -1103,7 +1104,7 @@ SymList* stringListToSymList(StringList *string_list) {
     StringNode *node;
     for (node = string_list->head->next; node != NULL; node = node->next) {
         // String *dupstring = dupString(node->data);
-        appendSym(sym_list,newSym(*node->data,CLIKE_VAR,1,-1,NULL,NULL,NULL,-1));
+        appendSym(sym_list,newSym(*node->data,CLIKE_VAR,1,-1,NULL,NULL,NULL,-1,NULL));
         // free(dupstring);
     }
     return sym_list;
@@ -1128,7 +1129,7 @@ void reconcileArgsCreateScope(Sym *func,SymList *decl_list) {
     // add all of the id parameters to the scope and add them to the parameter list at the same time
     for (string_node = func->args_id_list->head->next; string_node != NULL; string_node = string_node->next) {
         // String *dupstring = dupString(string_node->data);
-        Sym *newsym = newSym(*string_node->data,CLIKE_VAR,1,-1,NULL,NULL,NULL,-1);
+        Sym *newsym = newSym(*string_node->data,CLIKE_VAR,1,-1,NULL,NULL,NULL,-1,NULL);
         // free(dupstring);
         appendSym(parameters,newsym);
         putStringKSymVHashTable(func->scope,dupString(string_node->data),newsym);

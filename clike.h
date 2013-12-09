@@ -65,9 +65,10 @@ int hasReturnStmt(StmtList *stmt_list);
 Sym* newDummyDeclSym();
 Expr* newIntegerExpr(int value);
 Expr* newDoubleExpr(double value);
-QuadList* generateStmtListQuadList(StmtList *stmt_list,StringKSymVHashTable *scope,int *locals_bytes,StringKStringVHashTable *labels);
+QuadList* generateStmtListQuadList(StmtList *stmt_list,Sym *func,int *locals_bytes,StringKStringVHashTable *labels);
 char* getOperatorString(int operator);
-QuadList* generateStmtQuadList(Stmt *stmt,StringKSymVHashTable *scope,int *locals_bytes,StringKStringVHashTable *labels);
+QuadList* generateStmtQuadList(Stmt *stmt,Sym *func,int *locals_bytes,StringKStringVHashTable *labels);
 void generateQuads(SymList *funcs);
+QuadList* generateFuncCallQuadList(Sym *callee,ExprList *arg_list,Sym *func,int *locals_bytes,StringKStringVHashTable *labels);
 
 #endif
