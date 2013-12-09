@@ -4,6 +4,7 @@
 
 typedef struct sym Sym;
 
+// 
 typedef struct assg {
     Sym *sym;
     Expr *index,*expr;

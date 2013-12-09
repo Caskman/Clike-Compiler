@@ -14,6 +14,7 @@
 int line = 1;
 int inComments = 0;
 int is_duplicate_function = 0;
+int error_thrown = 0;
 Sym *current_function;
 StringKSymVHashTable *current_scope;
 StringKSymVHashTable *global_sym_table;
@@ -236,7 +237,167 @@ int compareStmt(Stmt *a,Stmt *b) {
 
 //======================================
 
+// TODO
+// make prepend functions
+// create quad and quadlist and quadlistlist datatypes and associated functions
+// make stringvstringkhashtable type
+// add headers for all such additions
+// create dummy quad that has a message; don't forget to dup the string provided; also consider where to store the message and print it
+
+
+//================INTERMEDIATE CODE GENERATION=============================
+
+
+QuadList* generateAssgStmtQuadList(Assg *assg,StringKSymVHashTable *scope,int *locals_bytes,StringKStringVHashTable *labels) {
+    if (assg == NULL) return newQuadList();
+    QuadList *list = newQuadList(),;
+}
+
+QuadList* generateReturnStmtQuadList(Stmt *return_stmt,StringKSymVHashTable *scope,int *locals_bytes,StringKStringVHashTable *labels) {
+    if (return_stmt == NULL) return newQuadList();
+    QuadList *list = newQuadList(),*value;
+
+    value = generateExprStmtQuadList(return_stmt->expr,scope,locals_bytes,labels);
+
+    // stuff here...
+    appendQuad(list,newDummyQuad("return statement here"));
+
+    return list;
+}
+
+QuadList* generateForStmtQuadList(Stmt *for_stmt,StringKSymVHashTable *scope,int *locals_bytes,StringKStringVHashTable *labels) {
+    if (for_stmt == NULL) return newQuadList();
+    QuadList *list = newQuadList(),*initial,*condition,*post_loop,*contents;
+
+    initial = generateAssgStmtQuadList(for_stmt->assg,scope,locals_bytes,labels);
+    condition = generateExprStmtQuadList(for_stmt->expr,scope,locals_bytes,labels);
+    post_loop = generateAssgStmtQuadList(for_stmt->assg2,scope,locals_bytes,labels);
+    contents = generateStmtQuadList(for_stmt->stmt,scope,locals_bytes,labels);
+
+    // arrange stuff here...
+    appendQuad(list,newDummyQuad("for statement woohoo!!"));
+
+    return list;
+}
+
+QuadList* generateWhileStmtQuadList(Stmt *while_stmt,StringKSymVHashTable *scope,int *locals_bytes,StringKStringVHashTable *labels) {
+    if (while_stmt == NULL) return newQuadList();
+    QuadList *list = newQuadList(),*contents,*condition;
+
+    condition = generateExprQuadList(while_stmt->expr,scope,locals_bytes,labels);
+    contents = generateStmtQuadList(while_stmt->stmt,scope,locals_bytes,labels);
+
+    // arrange the condition and contents...
+    appendQuad(list,newDummyQuad("while stmt here"));
+
+
+    return list;
+}
+
+QuadList* generateIfStmtQuadList(Stmt *if_stmt,StringKSymVHashTable *scope,int *locals_bytes,StringKStringVHashTable *labels) {
+    if (if_stmt == NULL) return newQuadList();
+    QuadList *list = newQuadList(),*true_list,*false_list;
+
+
+    true_list = generateStmtQuadList(if_stmt->stmt,scope,locals_bytes,labels);
+    false_list = generateStmtQuadList(if_stmt->stmt,scope,locals_bytes,labels);
+
+    // generate if else code here
+    appendQuad(list,newDummyQuad("if statement here"));
+
+    return list;
+}
+
+QuadList* generateStmtQuadList(Stmt *stmt,StringKSymVHashTable *scope,int *locals_bytes,StringKStringVHashTable *labels) {
+    if (stmt == NULL) return newQuadList();
+    QuadList *quad_list;
+    switch (stnode->data->stmt_type) {
+    case STMT_IF:
+        quad_list = generateIfStmtQuadList(stmt,scope,locals_bytes,labels);
+        break;
+    case STMT_WHILE:
+        quad_list = generateWhileStmtQuadList(stmt,scope,locals_bytes,labels);
+        break;
+    case STMT_FOR:
+        quad_list = generateForStmtQuadList(stmt,scope,locals_bytes,labels);
+        break;
+    case STMT_RETURN:
+        quad_list = generateReturnStmtQuadList(stmt,scope,locals_bytes,labels);
+        break;
+    case STMT_ASSG:
+        quad_list = generateAssgStmtQuadList(stmt->assg,scope,locals_bytes,labels);
+        break;
+    case STMT_STMTLIST:
+        quad_list = generateStmtListQuadList(stmt->stmt_list,scope,locals_bytes,labels);
+        break;
+    case STMT_FUNCCALL:
+        quad_list = generateFuncCallQuadList(stmt,scope,locals_bytes,labels);
+        break;
+    default:
+        fprintf(stderr, "SHOULD NOT SEE THIS generateStmtQuadList\n");
+        break;
+    }
+    return quad_list;
+}
+
+QuadList* generateStmtListQuadList(StmtList *stmt_list,StringKSymVHashTable *scope,int *locals_bytes,StringKStringVHashTable *labels) {
+    StmtNode *stnode;
+    QuadList *total_quad_list = newQuadList();
+    QuadList *quad_list;
+    for (stnode = stmt_list->head->next; stnode != NULL; stnode = stnode->next) {
+        quad_list = generateStmtQuadList(stnode->data,scope,locals_bytes,labels);
+
+        appendQuadListToList(total_quad_list,quad_list);
+        freeQuadListOnly(quad_list);
+        quad_list = NULL;
+
+    }
+    return total_quad_list;
+}
+
+void generateFuncQuadList(Sym *func) {
+    // retrieve locals and determine size necessary to store locals and temporaries
+    StringKSymVEntryList *scope_list = splatStringKSymVHashTable(func->scope);
+    StringKStringVHashTable *labels = newStringKStringVHashTable();
+    int locals_bytes = 0;
+    StringKSymVEntryNode *ssnode;
+    for (ssnode = scope_list->head->next; ssnode != NULL; ssnode = ssnode->next) locals_bytes += getSymBytes(ssnode->data->value);
+
+    // generate label for the beginning of this function
+    String prefix = "L_FUNC_";
+    String label = (String) malloc(sizeof(char)*(strlen(prefix) + strlen(func->id) + 1));
+    strcpy(label,prefix);
+    strcat(label,func->id);
+
+    // now generate quads for the function body
+    // pass the function symbol and the address of the locals_bytes so that if temporaries 
+    // are allocated, we can make room for them.  The temporaries will be added to the scope
+    // and their size added to the locals_bytes
+    QuadList *stmt_quads = generateStmtListQuadList(func->stmt_list,func->scope,&locals_bytes,labels);
+
+    prependQuad(newQuad(QUAD_ENTER,locals_bytes));
+    prependQuad(newQuad(QUAD_LABEL,label));
+
+}
+
+void generateQuads(SymList *funcs) {
+    if (error_thrown) return;
+    QuadListList *functioncode = new QuadListList();
+    SymNode *snode;
+    for (snode = funcs->head->next; snode != NULL; snode = snode->next) {
+
+        if (snode->data->type == CLIKE_FUNC) {
+            QuadList *quad_list = generateFuncQuadList(snode->data);
+            appendQuadList(functioncode,quad_list);
+        }
+    }
+}
+
+//======================================
+
+
 //================SEMANTICS=============================
+
 
 Expr* newIntegerExpr(int value) {
     return newExpr(INT,value,0.0,NULL,NULL,NULL,-1,NULL,NULL);
@@ -911,6 +1072,7 @@ Expr* idToExpr(String s,ExprList *expr_list,Expr *expr) {
 //=====================================================
 
 void yyerror(char const *s) {
+    error_thrown = 1;
 	fprintf(stderr,"Line %d: %s\n",line,s);
 }
 

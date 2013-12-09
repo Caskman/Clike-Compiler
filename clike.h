@@ -63,5 +63,4 @@ int hasReturnStmt(StmtList *stmt_list);
 Sym* newDummyDeclSym();
 Expr* newIntegerExpr(int value);
 Expr* newDoubleExpr(double value);
-
 #endif
