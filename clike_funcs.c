@@ -376,15 +376,19 @@ String toStr(int i) {
 }
 
 Sym* getTempSym(StringKSymVHashTable *scope,int *locals_bytes,Type type) {
-    int i; String name;
+    int i; String name,num;
     for (i = 0; ; i++) {
-        name = toStr(i);
+        num = toStr(i);
+        name = (String)malloc(sizeof(char)*(1 + strlen(num) + 1));
+        strcpy(name,"t");
+        strcat(name,num);
         if (getValueStringKSymVHashTable(scope,&name) == NULL) {
             Sym *news = newSym(name,CLIKE_VAR,1,type,NULL,NULL,NULL,-1,NULL);
             (*locals_bytes) += getSymBytes(news);
             putStringKSymVHashTable(scope,dupString(&name),news);
             return news;
         }
+        free(num);
         free(name);
     }
     return NULL;
@@ -409,6 +413,10 @@ Quad* getLabel(String func_name,StringKStringVHashTable *labels,String content) 
         free(s);
     } 
     return NULL;
+}
+
+void exprQuadError() {
+    fprintf(stderr,"ERROR GENERATING EXPRESSION QUADS\n");
 }
 
 QuadList* generateExprQuadList(Expr *expr,Sym *func,int *locals_bytes,StringKStringVHashTable *labels) {
@@ -522,11 +530,11 @@ QuadList* generateExprQuadList(Expr *expr,Sym *func,int *locals_bytes,StringKStr
         } else if (expr->type == INT) {
             tempdest = getTempSym(func->scope,locals_bytes,INT); // create temp
             appendQuad(list,newQuad(QUAD_INIT_INT,tempdest,NULL,NULL,NULL,-1,expr->intcon,0.0));
-        } else if (expr->type == DOUBLE) {
+        } else if (expr->type == DOUBLE_DECL) {
             tempdest = getTempSym(func->scope,locals_bytes,DOUBLE_DECL); // create temp
             appendQuad(list,newQuad(QUAD_INIT_DOUBLE,tempdest,NULL,NULL,NULL,-1,-1,expr->doublecon));
         } else {
-            fprintf(stderr,"ERROR GENERATING EXPRESSION QUADS\n");
+            exprQuadError();
         }
         break;
     }
