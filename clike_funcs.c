@@ -248,7 +248,7 @@ int compareStmt(Stmt *a,Stmt *b) {
 void printQuad(Quad *data) {
     switch (data->type) {
     case QUAD_DUMMY:
-        printf("\t%s\n",data->message);
+        printf("\t%s\n",data->string);
         break;
     case QUAD_ENTER:
         printf("\tenter %d\n", data->intcon);
@@ -358,6 +358,8 @@ QuadList* generateExprQuadList(Expr *expr,StringKSymVHashTable *scope,int *local
     right = generateExprQuadList(expr->right,scope,locals_bytes,labels);
 
     // stuff here...
+    left = right;
+    right = left;
     appendQuad(list,newDummyQuad("expr evaluation"));
 
     return list;
@@ -388,6 +390,8 @@ QuadList* generateAssgStmtQuadList(Assg *assg,StringKSymVHashTable *scope,int *l
     rhs = generateExprQuadList(assg->expr,scope,locals_bytes,labels);
 
     // stuff goes here...
+    index = rhs;
+    rhs = index;
     appendQuad(list,newDummyQuad("assignment here..."));
 
     return list;
@@ -395,11 +399,13 @@ QuadList* generateAssgStmtQuadList(Assg *assg,StringKSymVHashTable *scope,int *l
 
 QuadList* generateReturnStmtQuadList(Stmt *return_stmt,StringKSymVHashTable *scope,int *locals_bytes,StringKStringVHashTable *labels) {
     if (return_stmt == NULL) return newQuadList();
-    QuadList *list = newQuadList(),*value;
+    QuadList *list = newQuadList(),*value,*dummy;
 
     value = generateExprQuadList(return_stmt->expr,scope,locals_bytes,labels);
 
     // stuff here...
+    dummy = value;
+    value = dummy;
     appendQuad(list,newDummyQuad("return statement here"));
 
     return list;
@@ -415,6 +421,10 @@ QuadList* generateForStmtQuadList(Stmt *for_stmt,StringKSymVHashTable *scope,int
     contents = generateStmtQuadList(for_stmt->stmt,scope,locals_bytes,labels);
 
     // arrange stuff here...
+    initial = condition;
+    initial = post_loop;
+    initial = contents;
+    contents = initial;
     appendQuad(list,newDummyQuad("for statement woohoo!!"));
 
     return list;
@@ -428,6 +438,8 @@ QuadList* generateWhileStmtQuadList(Stmt *while_stmt,StringKSymVHashTable *scope
     contents = generateStmtQuadList(while_stmt->stmt,scope,locals_bytes,labels);
 
     // arrange the condition and contents...
+    condition = contents;
+    contents = condition;
     appendQuad(list,newDummyQuad("while stmt here"));
 
 
@@ -443,6 +455,8 @@ QuadList* generateIfStmtQuadList(Stmt *if_stmt,StringKSymVHashTable *scope,int *
     false_list = generateStmtQuadList(if_stmt->stmt,scope,locals_bytes,labels);
 
     // generate if else code here
+    true_list = false_list;
+    false_list = true_list;
     appendQuad(list,newDummyQuad("if statement here"));
 
     return list;
@@ -451,7 +465,7 @@ QuadList* generateIfStmtQuadList(Stmt *if_stmt,StringKSymVHashTable *scope,int *
 QuadList* generateStmtQuadList(Stmt *stmt,StringKSymVHashTable *scope,int *locals_bytes,StringKStringVHashTable *labels) {
     if (stmt == NULL) return newQuadList();
     QuadList *quad_list;
-    switch (stnode->data->stmt_type) {
+    switch (stmt->stmt_type) {
     case STMT_IF:
         quad_list = generateIfStmtQuadList(stmt,scope,locals_bytes,labels);
         break;
@@ -495,10 +509,10 @@ QuadList* generateStmtListQuadList(StmtList *stmt_list,StringKSymVHashTable *sco
     return total_quad_list;
 }
 
-void generateFuncQuadList(Sym *func) {
+QuadList* generateFuncQuadList(Sym *func) {
     // retrieve locals and determine size necessary to store locals and temporaries
     StringKSymVEntryList *scope_list = splatStringKSymVHashTable(func->scope);
-    StringKStringVHashTable *labels = newStringKStringVHashTable();
+    StringKStringVHashTable *labels = newStringKStringVHashTable(5);
     int locals_bytes = 0;
     StringKSymVEntryNode *ssnode;
     for (ssnode = scope_list->head->next; ssnode != NULL; ssnode = ssnode->next) locals_bytes += getSymBytes(ssnode->data->value);
@@ -513,16 +527,19 @@ void generateFuncQuadList(Sym *func) {
     // pass the function symbol and the address of the locals_bytes so that if temporaries 
     // are allocated, we can make room for them.  The temporaries will be added to the scope
     // and their size added to the locals_bytes
-    QuadList *stmt_quads = generateStmtListQuadList(func->stmt_list,func->scope,&locals_bytes,labels);
+    QuadList *stmt_quads = generateStmtListQuadList(func->body,func->scope,&locals_bytes,labels);
 
-    prependQuad(newQuad(QUAD_ENTER,locals_bytes));
-    prependQuad(newQuad(QUAD_LABEL,label));
+    prependQuad(stmt_quads,newQuad(QUAD_ENTER,NULL,NULL,NULL,NULL,-1,locals_bytes,0.0));
+    prependQuad(stmt_quads,newQuad(QUAD_LABEL,NULL,NULL,NULL,label,-1,-1,0.0));
 
+    // TODO still need to add leave and return 
+
+    return stmt_quads;
 }
 
 void generateQuads(SymList *funcs) {
     if (error_thrown) return;
-    QuadListList *functioncode = new QuadListList();
+    QuadListList *functioncode = newQuadListList();
     SymNode *snode;
     for (snode = funcs->head->next; snode != NULL; snode = snode->next) {
 

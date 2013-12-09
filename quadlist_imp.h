@@ -18,6 +18,9 @@
 #define QUAD_RETRIEVE 7653
 #define QUAD_DUMMY 3947
 
+#include "clike_types.h"
+typedef struct sym Sym;
+
 // initializations use intcon or doublecon and dest
 // assignments use dest,src,src2, and op
 // goto uses string

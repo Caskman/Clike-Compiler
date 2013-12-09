@@ -10,6 +10,8 @@
 #include "exprlist.h"
 #include "assglist_imp.h"
 #include "stmtlist_imp.h"
+#include "quadlist.h"
+#include "stringkstringvhashtable.h"
 
 void yyerror(char const *s);
 void logg(char const *s);
@@ -64,5 +66,8 @@ Sym* newDummyDeclSym();
 Expr* newIntegerExpr(int value);
 Expr* newDoubleExpr(double value);
 QuadList* generateStmtListQuadList(StmtList *stmt_list,StringKSymVHashTable *scope,int *locals_bytes,StringKStringVHashTable *labels);
+char* getOperatorString(int operator);
+QuadList* generateStmtQuadList(Stmt *stmt,StringKSymVHashTable *scope,int *locals_bytes,StringKStringVHashTable *labels);
+void generateQuads(SymList *funcs);
 
 #endif

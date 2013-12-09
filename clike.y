@@ -58,7 +58,7 @@
 
 %%
 opt_prog_element_list: 
-	/* epsilon */ 
+	/* epsilon */ {}
 	| prog_element_list {generateQuads($1);}
 prog_element_list:
 	prog_element {$$ = makeSESymList($1);}
