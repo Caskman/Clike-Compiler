@@ -4,6 +4,9 @@
 
 #define QUAD_INIT_INT 1094
 #define QUAD_INIT_DOUBLE 9374
+#define QUAD_NEG 928746
+#define QUAD_INV 1570
+#define QUAD_MV 2155
 #define QUAD_ASSG 923
 #define QUAD_GOTO 3983
 #define QUAD_BRANCH 286
@@ -22,13 +25,16 @@
 typedef struct sym Sym;
 
 // initializations use intcon or doublecon and dest
+// negation uses dest,src
+// inversion uses dest,src
+// move uses dest,src
 // assignments use dest,src,src2, and op
 // goto uses string
-// branch uses src,src2,op,string
+// branch uses src,intcon,op,string
 // labels use string
 // indexed assignments use dest,src,src2
 // enter uses intcon
-// param uses src,intcon
+// param uses src,intcon; intcon is zero-indexed
 // call uses string
 // retval uses src
 // retrieve uses dest
