@@ -121,7 +121,7 @@ void printType(Type *data) {
 }
 
 void freeType(Type *data) {
-    free(data);
+    if (data != NULL) free(data);
 }
 
 int compareType(Type *a,Type *b) {
@@ -1021,7 +1021,7 @@ char* getOperatorString(int operator) {
 
 char* getTypeString(Type type) {
     char *ret = (char*)malloc(sizeof(char)*12); // TODO arena malloc here
-    sprintf(ret,"compiler error");
+    sprintf(ret,"undefined");
     switch (type) {
         case INT:
             sprintf(ret,"INT");
@@ -1219,7 +1219,7 @@ Expr* idToExpr(String s,ExprList *expr_list,Expr *expr) {
 
     // error occurred, return an empty expression
     ExprNode *enode;
-    for (enode = expr_list->head->next; enode != NULL; enode = enode->next) freeExprShallow(enode->data);
+    if (expr_list != NULL) for (enode = expr_list->head->next; enode != NULL; enode = enode->next) freeExprShallow(enode->data);
     freeExprListOnly(expr_list);
     freeExprShallow(expr);
     return emptyExpr();
