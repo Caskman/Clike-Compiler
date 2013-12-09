@@ -509,10 +509,9 @@ QuadList* generateStmtListQuadList(StmtList *stmt_list,StringKSymVHashTable *sco
     return total_quad_list;
 }
 
-QuadList* generateFuncQuadList(Sym *func) {
+QuadList* generateFuncQuadList(Sym *func,StringKStringVHashTable *labels) {
     // retrieve locals and determine size necessary to store locals and temporaries
     StringKSymVEntryList *scope_list = splatStringKSymVHashTable(func->scope);
-    StringKStringVHashTable *labels = newStringKStringVHashTable(5);
     int locals_bytes = 0;
     StringKSymVEntryNode *ssnode;
     for (ssnode = scope_list->head->next; ssnode != NULL; ssnode = ssnode->next) locals_bytes += getSymBytes(ssnode->data->value);
@@ -532,7 +531,7 @@ QuadList* generateFuncQuadList(Sym *func) {
     prependQuad(stmt_quads,newQuad(QUAD_ENTER,NULL,NULL,NULL,NULL,-1,locals_bytes,0.0));
     prependQuad(stmt_quads,newQuad(QUAD_LABEL,NULL,NULL,NULL,label,-1,-1,0.0));
 
-    // TODO still need to add leave and return 
+    // TODO still need to add leave and return and add label to label table
 
     return stmt_quads;
 }
@@ -540,16 +539,17 @@ QuadList* generateFuncQuadList(Sym *func) {
 void generateQuads(SymList *funcs) {
     if (error_thrown) return;
     QuadListList *functioncode = newQuadListList();
+    StringKStringVHashTable *labels = newStringKStringVHashTable(5);
     SymNode *snode;
     for (snode = funcs->head->next; snode != NULL; snode = snode->next) {
 
-        if (snode->data->type == CLIKE_FUNC) {
-            QuadList *quad_list = generateFuncQuadList(snode->data);
+        if (snode->data->sym_type == CLIKE_FUNC) {
+            QuadList *quad_list = generateFuncQuadList(snode->data,labels);
             appendQuadList(functioncode,quad_list);
         }
     }
 
-
+    printQuadListList(functioncode);
 }
 
 //======================================
