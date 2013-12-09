@@ -629,10 +629,16 @@ QuadList* generateReturnStmtQuadList(Stmt *return_stmt,Sym *func,int *locals_byt
 
     value = generateExprQuadList(return_stmt->expr,func,locals_bytes,labels);
 
+    Sym *value_result = getValueDest(value);
+    appendQuad(list,newQuad(QUAD_RETVAL,NULL,value_result,NULL,NULL,-1,-1,0.0));
+    appendQuad(list,newQuad(QUAD_RETURN,NULL,NULL,NULL,NULL,-1,-1,0.0));
+
     // stuff here...
-    dummy = value;
-    value = dummy;
-    appendQuad(list,newDummyQuad("return statement here"));
+    // dummy = value;
+    // value = dummy;
+    // appendQuad(list,newDummyQuad("return statement here"));
+
+    freeQuadListOnly(value);
 
     return list;
 }
@@ -761,7 +767,7 @@ QuadList* generateFuncQuadList(Sym *func,StringKStringVHashTable *labels) {
 
     // TODO still need to add leave and return
 
-    appendQuad(stmt_quads,newQuad(QUAD_RETURN,NULL,NULL,NULL,NULL,-1,-1,0.0));
+    if (stmt_quads->tail->data->type != QUAD_RETURN) appendQuad(stmt_quads,newQuad(QUAD_RETURN,NULL,NULL,NULL,NULL,-1,-1,0.0));
 
     return stmt_quads;
 }
