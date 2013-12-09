@@ -7,6 +7,13 @@ typedef int Type;
 typedef struct expr_list ExprList;
 typedef struct sym Sym;
 
+// type is the evaluated type of this expression
+// intcon and doublecon are self explanatory
+// operator is the ascii or enum value of the operator
+// sym is the variable or function symbol of accession or a call
+// left and right are for the expression trees
+// index_expr is used with sym for array indexing
+// arg_list is used with sym for function call parameters
 typedef struct expr {
     Type type;
     int intcon,operator;

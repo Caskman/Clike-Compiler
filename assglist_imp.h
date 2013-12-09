@@ -4,7 +4,9 @@
 
 typedef struct sym Sym;
 
-// 
+// sym is the lhs id
+// index is the expression determining the index for the lhs id
+// expr is the rhs expression
 typedef struct assg {
     Sym *sym;
     Expr *index,*expr;

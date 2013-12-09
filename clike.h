@@ -63,4 +63,6 @@ int hasReturnStmt(StmtList *stmt_list);
 Sym* newDummyDeclSym();
 Expr* newIntegerExpr(int value);
 Expr* newDoubleExpr(double value);
+QuadList* generateStmtListQuadList(StmtList *stmt_list,StringKSymVHashTable *scope,int *locals_bytes,StringKStringVHashTable *labels);
+
 #endif
