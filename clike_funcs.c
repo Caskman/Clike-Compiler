@@ -643,19 +643,40 @@ QuadList* generateReturnStmtQuadList(Stmt *return_stmt,Sym *func,int *locals_byt
 
 QuadList* generateForStmtQuadList(Stmt *for_stmt,Sym *func,int *locals_bytes,StringKStringVHashTable *labels) {
     if (for_stmt == NULL) return newQuadList();
-    QuadList *list = newQuadList(),*initial,*condition,*post_loop,*contents;
+    QuadList *list = newQuadList(),*initial,*condition,*post_loop,*contents; Sym *condition_result;
 
     initial = generateAssgStmtQuadList(for_stmt->assg,func,locals_bytes,labels);
     condition = generateExprQuadList(for_stmt->expr,func,locals_bytes,labels);
     post_loop = generateAssgStmtQuadList(for_stmt->assg2,func,locals_bytes,labels);
     contents = generateStmtQuadList(for_stmt->stmt,func,locals_bytes,labels);
+    condition_result = getValueDest(condition);
+    Quad *content_label = getLabel(func->id,labels,"forcontents");
+    Quad *condition_label = getLabel(func->id,labels,"forcondition");
+
+    appendQuadListToListShallow(list,initial); // execute initial assg
+    appendQuad(list,newQuad(QUAD_GOTO,NULL,NULL,NULL,condition_label->string,-1,-1,0.0)); // jump to condition label
+    appendQuad(list,content_label); // add content label
+    appendQuadListToListShallow(list,contents); // execute contents
+    appendQuadListToListShallow(list,post_loop); // execute post_loop
+    appendQuad(list,condition_label); // add condition label
+    if (condition_result == NULL) {
+        appendQuad(list,newQuad(QUAD_GOTO,NULL,NULL,NULL,content_label->string,-1,-1,0.0));
+    } else {
+        appendQuadListToListShallow(list,condition); // evaluate condition
+        appendQuad(list,newQuad(QUAD_BRANCH,NULL,condition_result,NULL,content_label->string,D_EQ,1,0.0)); // branch to contents if condition is true
+    }
 
     // arrange stuff here...
-    initial = condition;
-    initial = post_loop;
-    initial = contents;
-    contents = initial;
-    appendQuad(list,newDummyQuad("for statement woohoo!!"));
+    // initial = condition;
+    // initial = post_loop;
+    // initial = contents;
+    // contents = initial;
+    // appendQuad(list,newDummyQuad("for statement woohoo!!"));
+
+    freeQuadListOnly(initial);
+    freeQuadListOnly(condition);
+    freeQuadListOnly(post_loop);
+    freeQuadListOnly(contents);
 
     return list;
 }
