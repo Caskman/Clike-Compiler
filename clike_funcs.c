@@ -1355,7 +1355,7 @@ int checkCallArgs(Sym *func,ExprList *arg_list) {
     int i;
     for (tnode = func->args_type_list->head->next, enode = arg_list->head->next, i=0;
             tnode != NULL && enode != NULL; tnode = tnode->next, enode = enode->next, i++) {
-        if (*tnode->data != enode->data->type) {
+        if (!checkTypeCompat(*tnode->data,enode->data->type)) {
             yyerror("");
             fprintf(stderr, "\targument %d is type <%s>, must be <%s>\n",arg_list->size-i,getTypeString(enode->data->type),getTypeString(*tnode->data));
             return 0;
