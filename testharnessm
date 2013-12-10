@@ -49,13 +49,15 @@ for testfile in $testfiles ; do
 	echo "=====$testprefix====="
 	in=${testdir}/${testprefix}.c
 	out=${outputdir}/${testprefix}.out
+	outcode=${outputdir}/${testprefix}.codeout
 	err=${outputdir}/${testprefix}.err
 	outexpect=${testdir}/${testprefix}.expected
 	outdiff=${outputdir}/${testprefix}.outdiff
 	# errexpect=${testdir}/${testprefix}.errexpected
 	# errdiff=${outputdir}/${testprefix}.errdiff
 
-	./$exec < $in > $out 2> $err
+	./$exec < $in > $outcode 2> $err
+	spim -file $outcode > $out
 	# cat $out
 	cat $err
 	diff $out $outexpect > $outdiff

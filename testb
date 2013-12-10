@@ -10,8 +10,8 @@ then
 fi
 
 # echo "*****TestA*****"
-# ./testharness clike TestingMIPS/TestA
+# ./testharnessm clike TestingMIPS/TestA
 echo "*****TestB*****"
-./testharness clike TestingMIPS/TestB
+./testharnessm clike TestingMIPS/TestB
 
 
