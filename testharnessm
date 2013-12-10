@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+set -u
+
+if [ $# -ne 2 ]
+then
+	echo "2 arguments are needed: executable testdir"
+	exit 1
+fi
+
+
+if [ -f $1 ] 
+then
+	exec=$1
+else 
+	echo "$1 does not exist"
+	exit 1
+fi
+
+if [ -d $2 ]
+then
+	testdir=$2
+else
+	echo "$2 does not exist"
+	exit 1
+fi
+
+
+testfiles=`ls $testdir`
+# testfiles=`ls $testdir | grep test.`
+
+echo "Executable: $exec"
+echo "Testing Directory: $testdir"
+outputdir=output
+rm -r $outputdir
+mkdir $outputdir
+
+prev=""
+
+for testfile in $testfiles ; do
+	dotloc=`expr index $testfile .`
+	dotloc=`expr $dotloc - 1`
+	testprefix=`expr substr $testfile 1 $dotloc`
+	if [ "$prev" = "$testprefix" ]
+	then
+		continue
+	else
+ 		prev=$testprefix
+	fi
+	echo "=====$testprefix====="
+	in=${testdir}/${testprefix}.c
+	out=${outputdir}/${testprefix}.out
+	err=${outputdir}/${testprefix}.err
+	outexpect=${testdir}/${testprefix}.expected
+	outdiff=${outputdir}/${testprefix}.outdiff
+	# errexpect=${testdir}/${testprefix}.errexpected
+	# errdiff=${outputdir}/${testprefix}.errdiff
+
+	./$exec < $in > $out 2> $err
+	# cat $out
+	cat $err
+	diff $out $outexpect > $outdiff
+	cat $outdiff
+	# diff $err $errexpect > $errdiff
+	# cat $errdiff
+done
+

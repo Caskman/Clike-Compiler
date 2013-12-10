@@ -1,0 +1,17 @@
+#! /usr/bin/env bash
+
+make clean
+make
+
+if [ $? -ne 0 ]
+then
+	echo "Compilaton Problems"
+	exit 1
+fi
+
+echo "*****TestA*****"
+./testharness clike TestingMIPS/TestA
+# echo "*****TestB*****"
+# ./testharness clike TestingMIPS/TestB
+
+
