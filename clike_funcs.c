@@ -433,9 +433,6 @@ QuadList* generateExprQuadList(Expr *expr,Sym *func,int *locals_bytes,StringKStr
     l_result = getValueDest(left);
     r_result = getValueDest(right);
     index_result = getValueDest(index);
-    if (right->size != 0) {
-        r_result = right->tail->data->dest;
-    } else r_result = NULL;
     // int type,Sym *dest,Sym *src,Sym *src2,String string,int op,int intcon,double doublecon
     switch (expr->operator) {
     case '-':
@@ -625,13 +622,14 @@ QuadList* generateAssgStmtQuadList(Assg *assg,Sym *func,int *locals_bytes,String
 
 QuadList* generateReturnStmtQuadList(Stmt *return_stmt,Sym *func,int *locals_bytes,StringKStringVHashTable *labels) {
     if (return_stmt == NULL) return newQuadList();
-    QuadList *list = newQuadList(),*value,*dummy;
+    QuadList *list = newQuadList(),*value;
 
     value = generateExprQuadList(return_stmt->expr,func,locals_bytes,labels);
 
     Sym *value_result = getValueDest(value);
-    appendQuad(list,newQuad(QUAD_RETVAL,NULL,value_result,NULL,NULL,-1,-1,0.0));
-    appendQuad(list,newQuad(QUAD_RETURN,NULL,NULL,NULL,NULL,-1,-1,0.0));
+    appendQuadListToListShallow(list,value); // eval expr
+    appendQuad(list,newQuad(QUAD_RETVAL,NULL,value_result,NULL,NULL,-1,-1,0.0)); // set as return val
+    appendQuad(list,newQuad(QUAD_RETURN,NULL,NULL,NULL,NULL,-1,-1,0.0)); // return
 
     // stuff here...
     // dummy = value;
@@ -664,15 +662,29 @@ QuadList* generateForStmtQuadList(Stmt *for_stmt,Sym *func,int *locals_bytes,Str
 
 QuadList* generateWhileStmtQuadList(Stmt *while_stmt,Sym *func,int *locals_bytes,StringKStringVHashTable *labels) {
     if (while_stmt == NULL) return newQuadList();
-    QuadList *list = newQuadList(),*contents,*condition;
+    QuadList *list = newQuadList(),*contents,*condition; Sym *condition_result;
 
     condition = generateExprQuadList(while_stmt->expr,func,locals_bytes,labels);
     contents = generateStmtQuadList(while_stmt->stmt,func,locals_bytes,labels);
+    condition_result = getValueDest(condition);
+    Quad *begin_label = getLabel(func->id,labels,"whilebeg");
+    Quad *condition_label = getLabel(func->id,labels,"whilecond");
+
+    appendQuad(list,newQuad(QUAD_GOTO,NULL,NULL,NULL,condition_label->string,-1,-1,0.0)); // jump to condition
+    appendQuad(list,begin_label); // add while begin label
+    appendQuadListToListShallow(list,contents); // execute contents
+    appendQuad(list,condition_label); // add condition label
+    appendQuadListToListShallow(list,condition); // eval condition
+    appendQuad(list,newQuad(QUAD_BRANCH,NULL,condition_result,NULL,begin_label->string,D_EQ,1,0.0)); // branch to whilebegin if true
+
+
+    freeQuadListOnly(condition);
+    freeQuadListOnly(contents);
 
     // arrange the condition and contents...
-    condition = contents;
-    contents = condition;
-    appendQuad(list,newDummyQuad("while stmt here"));
+    // condition = contents;
+    // contents = condition;
+    // appendQuad(list,newDummyQuad("while stmt here"));
 
 
     return list;
@@ -680,16 +692,31 @@ QuadList* generateWhileStmtQuadList(Stmt *while_stmt,Sym *func,int *locals_bytes
 
 QuadList* generateIfStmtQuadList(Stmt *if_stmt,Sym *func,int *locals_bytes,StringKStringVHashTable *labels) {
     if (if_stmt == NULL) return newQuadList();
-    QuadList *list = newQuadList(),*true_list,*false_list;
+    QuadList *list = newQuadList(),*true_quads,*false_quads,*expr_quads; Sym *expr_result;
+    Quad *true_label,*end_label;
+
+    expr_quads = generateExprQuadList(if_stmt->expr,func,locals_bytes,labels);
+    true_quads = generateStmtQuadList(if_stmt->stmt,func,locals_bytes,labels);
+    false_quads = generateStmtQuadList(if_stmt->else_clause,func,locals_bytes,labels);
+    expr_result = getValueDest(expr_quads);
+    true_label = getLabel(func->id,labels,"iftrue");
+    end_label = getLabel(func->id,labels,"endif");
+
+    appendQuadListToListShallow(list,expr_quads);  // eval expr
+    appendQuad(list,newQuad(QUAD_BRANCH,NULL,expr_result,NULL,true_label->string,D_EQ,1,0.0)); // branch to true on true
+    appendQuadListToListShallow(list,false_quads); // eval false clause
+    appendQuad(list,newQuad(QUAD_GOTO,NULL,NULL,NULL,end_label->string,-1,-1,0.0)); // jump to end of if
+    appendQuad(list,true_label); // add true label
+    appendQuadListToListShallow(list,true_quads); // eval true clause
+    appendQuad(list,end_label); // add end if label
 
 
-    true_list = generateStmtQuadList(if_stmt->stmt,func,locals_bytes,labels);
-    false_list = generateStmtQuadList(if_stmt->stmt,func,locals_bytes,labels);
-
-    // generate if else code here
-    true_list = false_list;
-    false_list = true_list;
-    appendQuad(list,newDummyQuad("if statement here"));
+    freeQuadListOnly(expr_quads);
+    freeQuadListOnly(true_quads);
+    freeQuadListOnly(false_quads);
+    // true_quads = false_quads;
+    // false_quads = true_quads;
+    // appendQuad(list,newDummyQuad("if statement here"));
 
     return list;
 }
@@ -699,28 +726,29 @@ QuadList* generateStmtQuadList(Stmt *stmt,Sym *func,int *locals_bytes,StringKStr
     QuadList *quad_list;
     switch (stmt->stmt_type) {
     case STMT_IF:
-        quad_list = generateIfStmtQuadList(stmt,func,locals_bytes,labels);
-        break;
+        quad_list = generateIfStmtQuadList(stmt,func,locals_bytes,labels); break;
     case STMT_WHILE:
-        quad_list = generateWhileStmtQuadList(stmt,func,locals_bytes,labels);
-        break;
+        quad_list = generateWhileStmtQuadList(stmt,func,locals_bytes,labels); break;
     case STMT_FOR:
-        quad_list = generateForStmtQuadList(stmt,func,locals_bytes,labels);
-        break;
+        quad_list = generateForStmtQuadList(stmt,func,locals_bytes,labels); break;
     case STMT_RETURN:
-        quad_list = generateReturnStmtQuadList(stmt,func,locals_bytes,labels);
-        break;
+        quad_list = generateReturnStmtQuadList(stmt,func,locals_bytes,labels); break;
     case STMT_ASSG:
-        quad_list = generateAssgStmtQuadList(stmt->assg,func,locals_bytes,labels);
-        break;
+        quad_list = generateAssgStmtQuadList(stmt->assg,func,locals_bytes,labels); break;
     case STMT_STMTLIST:
-        quad_list = generateStmtListQuadList(stmt->stmt_list,func,locals_bytes,labels);
-        break;
+        quad_list = generateStmtListQuadList(stmt->stmt_list,func,locals_bytes,labels); break;
     case STMT_FUNCCALL:
-        quad_list = generateFuncCallQuadList(stmt->sym,stmt->expr_list,func,locals_bytes,labels);
-        break;
+        quad_list = generateFuncCallQuadList(stmt->sym,stmt->expr_list,func,locals_bytes,labels); break;
+    case STMT_ELSE:
+        quad_list = generateStmtQuadList(stmt->stmt,func,locals_bytes,labels); break;
     default:
         fprintf(stderr, "SHOULD NOT SEE THIS generateStmtQuadList\n");
+        switch (stmt->stmt_type) {
+        case STMT_EMPTY:
+            fprintf(stderr,"STMT_EMPTY\n"); break;
+        case STMT_FORCON:
+            fprintf(stderr,"STMT_FORCON\n"); break;
+        }
         break;
     }
     return quad_list;
@@ -928,7 +956,7 @@ Stmt* createIfStmt(Expr *expr,Stmt *else_clause,Stmt *stmt) {
         fprintf(stderr, "\tconditional must evaluate to a boolean\n");
         expr = emptyExpr();
     }
-    return newStmt(STMT_IF,NULL,else_clause,stmt,NULL,NULL,NULL,NULL,NULL);
+    return newStmt(STMT_IF,NULL,else_clause,stmt,expr,NULL,NULL,NULL,NULL);
 }
 
 Stmt* createWhileStmt(Expr *expr,Stmt *stmt) {
@@ -1222,6 +1250,7 @@ void reconcileArgsCreateScope(Sym *func,SymList *decl_list) {
 
 char* getOperatorString(int operator) {
     char *ret = (char*)malloc(sizeof(char)*3); // TODO arena malloc here
+    ret[2] = '\0';
     switch (operator) {
         case '+':
         case '-':

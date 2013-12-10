@@ -62,7 +62,7 @@ opt_prog_element_list:
 	| prog_element_list {generateQuads($1);}
 prog_element_list:
 	prog_element {$$ = makeSESymList($1);}
-	| prog_element prog_element_list {$$ = appendSym($2,$1);}
+	| prog_element prog_element_list {$$ = prependSym($2,$1);}
 prog_element:
 	dcl ';' {checkSymListForDups($1); checkAndLogSymTable(global_sym_table,$1); $$ = newDummyDeclSym();}
 	| func {$$ = $1;}
@@ -73,7 +73,7 @@ opt_stmt_list:
 	| stmt_list {$$ = $1;}
 stmt_list:
 	stmt ';' {$$ = makeSEStmtList($1);}
-	| stmt ';' stmt_list {$$ = appendStmt($3,$1);}
+	| stmt ';' stmt_list {$$ = prependStmt($3,$1);}
 opt_stmt:
 	/* epsilon */ {$$ = NULL;}
 	| stmt {$$ = $1;}
@@ -105,7 +105,7 @@ opt_expr_list:
 	| expr_list {$$ = $1;}
 expr_list:
 	expr {$$ = makeSEExprList($1);}
-	| expr ',' expr_list {$$ = appendExpr($3,$1);}
+	| expr ',' expr_list {$$ = prependExpr($3,$1);}
 opt_expr:
 	/* epsilon */ {$$ = NULL;}
 	| expr {$$ = $1;}
@@ -137,12 +137,12 @@ opt_loc_dcl_list:
 	| loc_dcl_list {$$ = $1;}
 loc_dcl_list:
 	loc_dcl {$$ = $1;}
-	| loc_dcl loc_dcl_list {$$ = appendSymListToList($2,$1);}
+	| loc_dcl loc_dcl_list {$$ = appendSymListToListShallow($1,$2);}
 loc_dcl:
 	type id_list ';' {$$ = changeIDListToSymListAndSetType($2,$1);}
 id_list:
 	ID {$$ = makeSEStringListWoP($1);}
-	| ID ',' id_list {$$ = appendStringWoP($3,$1);}
+	| ID ',' id_list {$$ = prependStringWoP($3,$1);}
 func_header:
 	ID '(' ')' {$$ = newFunctionHeader(INT,$1,newStringList());}
 	| VOID ID '(' ')' {$$ = newFunctionHeader(VOID,$2,newStringList());}
@@ -155,7 +155,7 @@ dcl:
 	| VOID f_prot_list {$$ = setTypesSymList($2,VOID);}
 dclr_list:
 	dclr {$$ = makeSESymList($1);}
-	| dclr ',' dclr_list {$$ = appendSym($3,$1);}
+	| dclr ',' dclr_list {$$ = prependSym($3,$1);}
 dclr:
 	f_prot {$$ = $1;}
 	| ID opt_array_size {$$ = newVarDecl(VOID,$1,$2);}
@@ -166,13 +166,13 @@ array_size:
 	'[' INTEGER ']' {$$ = $2;}
 f_prot_list:
 	f_prot {$$ = makeSESymList($1);}
-	| f_prot ',' f_prot_list {$$ = appendSym($3,$1);}
+	| f_prot ',' f_prot_list {$$ = prependSym($3,$1);}
 f_prot:
 	ID '(' type_list ')' {$$ = newFProt(0,$1,$3);}
 	| ID '(' ')' {$$ = newFProt(0,$1,newTypeList());}
 type_list:
 	type {$$ = makeSETypeListWoP($1);}
-	| type ',' type_list {$$ = appendTypeWoP($3,$1);}
+	| type ',' type_list {$$ = prependTypeWoP($3,$1);}
 type:
 	CHAR {$$ = CHAR;}
 	| INT {$$ = INT;}
