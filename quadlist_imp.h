@@ -19,6 +19,7 @@
 #define QUAD_RETVAL 3476
 #define QUAD_RETURN 2346
 #define QUAD_RETRIEVE 7653
+#define QUAD_GLOBAL 92578
 #define QUAD_DUMMY 3947
 
 #include "clike_types.h"
@@ -38,6 +39,7 @@ typedef struct sym Sym;
 // call uses string
 // retval uses src
 // retrieve uses dest
+// global uses src
 typedef struct quad {
     int type,op,intcon;
     double doublecon;

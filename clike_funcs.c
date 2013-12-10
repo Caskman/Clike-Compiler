@@ -99,7 +99,7 @@ int compareSym(Sym *a,Sym *b) {
     return compareString(&a->id,&b->id);
 }
 
-Sym* dupSym(Sym *data) { // TODO doesn't seem to used ever
+Sym* dupSym(Sym *data) { // TODO doesn't seem to used ever but still required by templatelist
     Sym *f = (Sym*)malloc(sizeof(Sym));
     f->id = (char*)strdup(data->id);
     f->sym_type = data->sym_type;
@@ -248,63 +248,26 @@ int compareStmt(Stmt *a,Stmt *b) {
 
 void printQuad(Quad *data) {
     switch (data->type) {
-    case QUAD_DUMMY:
-        printf("\t%s\n",data->string);
-        break;
-    case QUAD_ENTER:
-        printf("\tenter %d\n", data->intcon);
-        break;
-    case QUAD_INIT_INT:
-        printf("\t%s := %d\n",data->dest->id,data->intcon);
-        break;
-    case QUAD_INIT_DOUBLE:
-        printf("\t%s := %f\n",data->dest->id,data->doublecon);
-        break;
-    case QUAD_NEG:
-        printf("\t%s := -%s\n",data->dest->id,data->src->id);
-        break;
-    case QUAD_INV:
-        printf("\t%s := !%s\n",data->dest->id,data->src->id);
-        break;
-    case QUAD_MV:
-        printf("\t%s := %s\n",data->dest->id,data->src->id);
-        break;
-    case QUAD_ASSG:
-        printf("\t%s := %s %s %s\n",data->dest->id,data->src->id,getOperatorString(data->op),data->src2->id);
-        break;
-    case QUAD_GOTO:
-        printf("\tgoto %s\n",data->string);
-        break;
-    case QUAD_BRANCH:
-        printf("\tif %s %s %d goto %s\n",data->src->id,getOperatorString(data->op),data->intcon,data->string);
-        break;
-    case QUAD_LABEL:
-        printf("%s:\n", data->string);
-        break;
-    case QUAD_INDX_L:
-        printf("\t%s[%s] := %s\n",data->dest->id,data->src->id,data->src2->id);
-        break;
-    case QUAD_INDX_R:
-        printf("\t%s := %s[%s]\n",data->dest->id,data->src->id,data->src2->id);
-        break;
-    case QUAD_PARAM:
-        printf("\tparam %s,%d\n",data->src->id,data->intcon);
-        break;
-    case QUAD_CALL:
-        printf("\tcall %s\n",data->string);
-        break;
-    case QUAD_RETVAL:
-        printf("\tretval %s\n",data->src->id);
-        break;
-    case QUAD_RETURN:
-        printf("\treturn\n");
-        break;
-    case QUAD_RETRIEVE:
-        printf("\tretrieve %s\n",data->dest->id);
-        break;
-    default:
-        printf("ERROR ERROR ERROR\n");
-        break;
+    case QUAD_DUMMY: printf("\t%s\n",data->string); break;
+    case QUAD_ENTER: printf("\tenter %d\n", data->intcon); break;
+    case QUAD_INIT_INT: printf("\t%s := %d\n",data->dest->id,data->intcon); break;
+    case QUAD_INIT_DOUBLE: printf("\t%s := %f\n",data->dest->id,data->doublecon); break;
+    case QUAD_NEG: printf("\t%s := -%s\n",data->dest->id,data->src->id); break;
+    case QUAD_INV: printf("\t%s := !%s\n",data->dest->id,data->src->id); break;
+    case QUAD_MV: printf("\t%s := %s\n",data->dest->id,data->src->id); break;
+    case QUAD_ASSG: printf("\t%s := %s %s %s\n",data->dest->id,data->src->id,getOperatorString(data->op),data->src2->id); break;
+    case QUAD_GOTO: printf("\tgoto %s\n",data->string); break;
+    case QUAD_BRANCH: printf("\tif %s %s %d goto %s\n",data->src->id,getOperatorString(data->op),data->intcon,data->string); break;
+    case QUAD_LABEL: printf("%s:\n", data->string); break;
+    case QUAD_INDX_L: printf("\t%s[%s] := %s\n",data->dest->id,data->src->id,data->src2->id); break;
+    case QUAD_INDX_R: printf("\t%s := %s[%s]\n",data->dest->id,data->src->id,data->src2->id); break;
+    case QUAD_PARAM: printf("\tparam %s,%d\n",data->src->id,data->intcon); break;
+    case QUAD_CALL: printf("\tcall %s\n",data->string); break;
+    case QUAD_RETVAL: printf("\tretval %s\n",data->src->id); break;
+    case QUAD_RETURN: printf("\treturn\n"); break;
+    case QUAD_RETRIEVE: printf("\tretrieve %s\n",data->dest->id); break;
+    case QUAD_GLOBAL: printf("\tglobal %s %s[%d]\n",getTypeString(data->src->type),data->src->id,data->src->array_size); break;
+    default: printf("ERROR ERROR ERROR\n"); break;
     }
 }
 
@@ -507,20 +470,6 @@ QuadList* generateExprQuadList(Expr *expr,Sym *func,int *locals_bytes,StringKStr
             left = generateFuncCallQuadList(expr->sym,expr->arg_list,func,locals_bytes,labels);
             l_result = getValueDest(left);
             appendQuadListToListShallow(list,left); // call function
-            // tempdest = getTempSym(func->scope,locals_bytes,expr->sym->type); // get temp
-            // appendQuad(list,newQuad(QUAD_MV,tempdest,l_result,NULL,NULL,-1,-1,0.0)); // move result
-            // ExprNode *enode; QuadList *elist; int i;
-            // for (i = 0, enode = expr->arg_list->head->next; enode != NULL; i++, enode = enode->next) {
-            //     elist = generateExprQuadList(enode->data,func,locals_bytes,labels);
-            //     appendQuadListToListShallow(list,elist); // eval parameter
-            //     result = getValueDest(elist); // get location of result
-            //     freeQuadListOnly(elist);
-
-            //     appendQuad(list,newQuad(QUAD_PARAM,NULL,result,NULL,NULL,-1,i,0.0)); // set parameter
-            // }
-            // appendQuad(list,newQuad(QUAD_CALL,NULL,NULL,NULL,expr->sym->id,-1,-1,0.0)); // call function
-            // tempdest = getTempSym(func->scope,locals_bytes,sym->type); // create temp
-            // appendQuad(list,newQuad(QUAD_RETRIEVE,tempdest,NULL,NULL,NULL,-1,-1,0.0)); // retrieve return value
         } else if (expr->sym != NULL && expr->index_expr == NULL && expr->arg_list == NULL) { // variable
             tempdest = getTempSym(func->scope,locals_bytes,expr->sym->type); // create temp
             appendQuad(list,newQuad(QUAD_MV,tempdest,expr->sym,NULL,NULL,-1,-1,0.0)); // move contents
@@ -536,10 +485,6 @@ QuadList* generateExprQuadList(Expr *expr,Sym *func,int *locals_bytes,StringKStr
         break;
     }
 
-    // stuff here...
-    // left = right;
-    // right = left;
-    // appendQuad(list,newDummyQuad("expr evaluation"));
 
     freeQuadListOnly(left);
     freeQuadListOnly(right);
@@ -569,23 +514,12 @@ QuadList* generateFuncCallQuadList(Sym *callee,ExprList *arg_list,Sym *func,int 
     }
 
     freeQuadListListOnly(parameter_quads);
-    // ExprNode *enode; QuadList *elist; int i;
-    // for (i = 0, enode = expr->arg_list->head->next; enode != NULL; i++, enode = enode->next) {
-    //     elist = generateExprQuadList(enode->data,func,locals_bytes,labels);
-    //     appendQuadListToListShallow(list,elist); // eval parameter
-    //     result = getValueDest(elist); // get location of result
-    //     freeQuadListOnly(elist);
-
-    //     appendQuad(list,newQuad(QUAD_PARAM,NULL,result,NULL,NULL,-1,i,0.0)); // set parameter
-    // }
     appendQuad(list,newQuad(QUAD_CALL,NULL,NULL,NULL,callee->id,-1,-1,0.0)); // call function
     if (callee->type != VOID) {
         tempdest = getTempSym(func->scope,locals_bytes,callee->type); // create temp
         appendQuad(list,newQuad(QUAD_RETRIEVE,tempdest,NULL,NULL,NULL,-1,-1,0.0)); // retrieve return value
     }
 
-    // call the function now...
-    // appendQuad(list,newDummyQuad("function call here"));
 
     return list;
 }
@@ -609,10 +543,6 @@ QuadList* generateAssgStmtQuadList(Assg *assg,Sym *func,int *locals_bytes,String
         appendQuad(list,newQuad(QUAD_INDX_L,assg->sym,index_result,rhs_result,NULL,-1,-1,0.0));
     }
 
-    // stuff goes here...
-    // index = rhs;
-    // rhs = index;
-    // appendQuad(list,newDummyQuad("assignment here..."));
 
     freeQuadListOnly(index);
     freeQuadListOnly(rhs);
@@ -631,10 +561,6 @@ QuadList* generateReturnStmtQuadList(Stmt *return_stmt,Sym *func,int *locals_byt
     appendQuad(list,newQuad(QUAD_RETVAL,NULL,value_result,NULL,NULL,-1,-1,0.0)); // set as return val
     appendQuad(list,newQuad(QUAD_RETURN,NULL,NULL,NULL,NULL,-1,-1,0.0)); // return
 
-    // stuff here...
-    // dummy = value;
-    // value = dummy;
-    // appendQuad(list,newDummyQuad("return statement here"));
 
     freeQuadListOnly(value);
 
@@ -666,12 +592,6 @@ QuadList* generateForStmtQuadList(Stmt *for_stmt,Sym *func,int *locals_bytes,Str
         appendQuad(list,newQuad(QUAD_BRANCH,NULL,condition_result,NULL,content_label->string,D_EQ,1,0.0)); // branch to contents if condition is true
     }
 
-    // arrange stuff here...
-    // initial = condition;
-    // initial = post_loop;
-    // initial = contents;
-    // contents = initial;
-    // appendQuad(list,newDummyQuad("for statement woohoo!!"));
 
     freeQuadListOnly(initial);
     freeQuadListOnly(condition);
@@ -702,10 +622,6 @@ QuadList* generateWhileStmtQuadList(Stmt *while_stmt,Sym *func,int *locals_bytes
     freeQuadListOnly(condition);
     freeQuadListOnly(contents);
 
-    // arrange the condition and contents...
-    // condition = contents;
-    // contents = condition;
-    // appendQuad(list,newDummyQuad("while stmt here"));
 
 
     return list;
@@ -735,9 +651,6 @@ QuadList* generateIfStmtQuadList(Stmt *if_stmt,Sym *func,int *locals_bytes,Strin
     freeQuadListOnly(expr_quads);
     freeQuadListOnly(true_quads);
     freeQuadListOnly(false_quads);
-    // true_quads = false_quads;
-    // false_quads = true_quads;
-    // appendQuad(list,newDummyQuad("if statement here"));
 
     return list;
 }
@@ -798,12 +711,7 @@ QuadList* generateFuncQuadList(Sym *func,StringKStringVHashTable *labels) {
     for (ssnode = scope_list->head->next; ssnode != NULL; ssnode = ssnode->next) locals_bytes += getSymBytes(ssnode->data->value);
 
     // generate label for the beginning of this function
-    String prefix = "L_FUNC_";
-    String *label = (String*)malloc(sizeof(String));
-    *label = (String) malloc(sizeof(char)*(strlen(prefix) + strlen(func->id) + 1));
-    strcpy(*label,prefix);
-    strcat(*label,func->id);
-    putStringKStringVHashTable(labels,dupString(label),label);
+    putStringKStringVHashTable(labels,dupString(&func->id),&func->id);
 
     // now generate quads for the function body
     // pass the function symbol and the address of the locals_bytes so that if temporaries 
@@ -812,18 +720,35 @@ QuadList* generateFuncQuadList(Sym *func,StringKStringVHashTable *labels) {
     QuadList *stmt_quads = generateStmtListQuadList(func->body,func,&locals_bytes,labels);
 
     prependQuad(stmt_quads,newQuad(QUAD_ENTER,NULL,NULL,NULL,NULL,-1,locals_bytes,0.0));
-    prependQuad(stmt_quads,newQuad(QUAD_LABEL,NULL,NULL,NULL,*label,-1,-1,0.0));
+    prependQuad(stmt_quads,newQuad(QUAD_LABEL,NULL,NULL,NULL,func->id,-1,-1,0.0));
 
-    // TODO still need to add leave and return
 
     if (stmt_quads->tail->data->type != QUAD_RETURN) appendQuad(stmt_quads,newQuad(QUAD_RETURN,NULL,NULL,NULL,NULL,-1,-1,0.0));
 
     return stmt_quads;
 }
 
+Quad* generateGlobalQuad(Sym *global) {
+    return newQuad(QUAD_GLOBAL,NULL,global,NULL,NULL,-1,-1,0.0);
+}
+
 void generateQuads(SymList *funcs) {
     if (error_thrown) return;
     QuadListList *functioncode = newQuadListList();
+
+    // generate global quads first
+    QuadList *global_quads = newQuadList(); Quad *global;
+    StringKSymVEntryList *global_list = splatStringKSymVHashTable(global_sym_table);
+    StringKSymVEntryNode *ssnode;
+    for (ssnode = global_list->head->next; ssnode != NULL; ssnode = ssnode->next) {
+        if (ssnode->data->value->sym_type == CLIKE_VAR) {
+            global = generateGlobalQuad(ssnode->data->value);
+            appendQuad(global_quads,global);
+        }
+    }
+    appendQuadList(functioncode,global_quads);
+
+    // generate function quads
     StringKStringVHashTable *labels = newStringKStringVHashTable(5);
     SymNode *snode;
     for (snode = funcs->head->next; snode != NULL; snode = snode->next) {
@@ -835,6 +760,10 @@ void generateQuads(SymList *funcs) {
     }
 
     printQuadListList(functioncode);
+
+    QuadListNode *qnode;
+    for (qnode = functioncode->head->next; qnode != NULL; qnode = qnode->next) freeQuadListOnly(qnode->data);
+    freeQuadListListOnly(functioncode);
 }
 
 //======================================
@@ -1100,11 +1029,6 @@ void checkSymListForDups(SymList *list) {
     }
 }
 
-// void checkFunction(StringKSymVHashTable *table,Sym *function) { // TODO this function never seems to be used
-//     SymList *list= makeSESymList(function);
-//     checkAndLogSymTable(table,list);
-//     freeSymListOnly(list);
-// }
 
 Sym* checkAndLogFuncWithSymTable(StringKSymVHashTable *table,Sym *func) {
     Sym *prototype = getValueStringKSymVHashTable(table,&func->id);
