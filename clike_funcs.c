@@ -1,6 +1,8 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <ctype.h>
+#include <unistd.h>
 #include <string.h>
 #include <stdarg.h>
 #include "clike.h"
@@ -21,6 +23,7 @@ int line = 1;
 int inComments = 0;
 int is_duplicate_function = 0;
 int error_thrown = 0;
+int print_quads = 0;
 Sym *current_function;
 StringKSymVHashTable *current_scope;
 StringKSymVHashTable *global_sym_table;
@@ -732,7 +735,7 @@ Quad* generateGlobalQuad(Sym *global) {
     return newQuad(QUAD_GLOBAL,NULL,global,NULL,NULL,-1,-1,0.0);
 }
 
-void generateQuads(SymList *funcs) {
+void generateCode(SymList *funcs) {
     if (error_thrown) return;
     QuadListList *functioncode = newQuadListList();
 
@@ -759,7 +762,10 @@ void generateQuads(SymList *funcs) {
         }
     }
 
-    printQuadListList(functioncode);
+    if (print_quads) printQuadListList(functioncode);
+    else {
+
+    }
 
     QuadListNode *qnode;
     for (qnode = functioncode->head->next; qnode != NULL; qnode = qnode->next) freeQuadListOnly(qnode->data);
@@ -1454,7 +1460,17 @@ void printConsts() {
     printf("INT: %d; DOUBLE: %d, CHAR: %d, VOID: %d\n",INT,DOUBLE_DECL,CHAR,VOID);
 }
 
-int main() {
+int main(int argc,char **argv) {
+    if (argc == 2) {
+        if (strcmp(argv[1],"-im") == 0) {
+            print_quads = 1;
+        } else {
+            fprintf(stderr, "Unknown option: %s\n", argv[1]);
+            return 1;
+        }
+    } 
+
+
     // printConsts();
     global_sym_table = newStringKSymVHashTable(20);
     setScope(global_sym_table);

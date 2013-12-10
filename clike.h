@@ -68,7 +68,7 @@ Expr* newDoubleExpr(double value);
 QuadList* generateStmtListQuadList(StmtList *stmt_list,Sym *func,int *locals_bytes,StringKStringVHashTable *labels);
 char* getOperatorString(int operator);
 QuadList* generateStmtQuadList(Stmt *stmt,Sym *func,int *locals_bytes,StringKStringVHashTable *labels);
-void generateQuads(SymList *funcs);
+void generateCode(SymList *funcs);
 QuadList* generateFuncCallQuadList(Sym *callee,ExprList *arg_list,Sym *func,int *locals_bytes,StringKStringVHashTable *labels);
 
 #endif

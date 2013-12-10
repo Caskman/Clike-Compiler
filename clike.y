@@ -59,7 +59,7 @@
 %%
 opt_prog_element_list: 
 	/* epsilon */ {}
-	| prog_element_list {generateQuads($1);}
+	| prog_element_list {generateCode($1);}
 prog_element_list:
 	prog_element {$$ = makeSESymList($1);}
 	| prog_element prog_element_list {$$ = prependSym($2,$1);}
