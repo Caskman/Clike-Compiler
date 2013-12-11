@@ -3,7 +3,9 @@
 #define INSTRLIST_IMP
 
 #define INSTR_COMMENT 2349
+#define INSTR_SW 91750
 
+// sw uses src,src2,i; src is for the value to store, src2 is the address, i is immediate
 // dummy uses src
 
 typedef char* String;

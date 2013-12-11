@@ -20,6 +20,7 @@ typedef struct sym {
     StringKSymVHashTable *scope;
     int array_size;
     StmtList *body;
+    int offset;
 } Sym;
 
 void printString(String *data);

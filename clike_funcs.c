@@ -75,7 +75,7 @@ unsigned int hashString(String *key) {
 
 //================Sym================
 
-Sym* newSym(String id,int sym_type,int is_defined,Type type,TypeList *args_type_list,StringList *args_id_list,StringKSymVHashTable *scope,int array_size,StmtList *body) {
+Sym* newSym(String id,int sym_type,int is_defined,Type type,TypeList *args_type_list,StringList *args_id_list,StringKSymVHashTable *scope,int array_size,StmtList *body,int offset) {
     Sym *f = (Sym*)malloc(sizeof(Sym));
     f->id = id;
     f->sym_type = sym_type;
@@ -86,6 +86,7 @@ Sym* newSym(String id,int sym_type,int is_defined,Type type,TypeList *args_type_
     f->scope = scope;
     f->array_size = array_size;
     f->body = body;
+    f->offset = offset;
     return f;
 }
 
@@ -373,6 +374,8 @@ String toStr(int i) {
 // TODO
 // finish std lib implementations, still need to do todouble
 // then resolve compile errors and move on
+// implement something to make all labels unique, except for main?
+// create register flyweights and make flyweight initializers; don't need freers since arena malloc plan will take care of that
 
 //================FINAL CODE GENERATION=============================
 
@@ -423,7 +426,6 @@ InstrList* genJumpCode(Quad *quad) {
 
     // QUAD_GOTO
     // QUAD_CALL
-    // on call, you need to save the temporary registers ($t0,$t1,$t2) and then restore them afterwards
 
     // QUAD_RETURN
 
@@ -461,6 +463,16 @@ void errorMIPSGen(String s) {
 InstrList* generateFunctionMIPSCode(QuadList *function_code) {
     QuadNode *qnode;
     InstrList *function_list = newInstrList(),*temp_list;
+    // Quad *enterquad = functioncode->head->next->data;
+    // create prototype
+    // create space on the stack, save $fp and $ra, and update $fp
+    // appendInstr(function_list,newInstr(INSTR_SUBU,get_sp_reg(),get_sp_reg(),toStr(enterquad->intcon + 8))); // subu $sp,$sp,(8+locals_bytes)
+    // appendInstr(function_list,newInstr(INSTR_SW,NULL,get_ra_reg(),get_sp_reg(),4)); // sw $ra,4($sp)
+    // appendInstr(function_list,newInstr(INSTR_SW,NULL,get_fp_reg(),get_sp_reg(),0)); // sw $fp,0($sp)
+    // appendInstr(function_list,newInstr(INSTR_ADDU,get_fp_reg(),get_sp_reg(),toStr(enterquad->intcon + 4))); // addu $fp,$sp,(4 + locals_bytes)
+
+
+
     for (qnode = function_code->head->next; qnode != NULL; qnode = qnode->next) {
         switch (qnode->data->type) {
         case QUAD_INIT_INT:
@@ -574,7 +586,7 @@ Sym* getTempSym(StringKSymVHashTable *scope,int *locals_bytes,Type type) {
         strcpy(name,"t");
         strcat(name,num);
         if (getValueStringKSymVHashTable(scope,&name) == NULL) {
-            Sym *news = newSym(name,CLIKE_VAR,1,type,NULL,NULL,NULL,-1,NULL);
+            Sym *news = newSym(name,CLIKE_VAR,1,type,NULL,NULL,NULL,-1,NULL,-1);
             (*locals_bytes) += getSymBytes(news);
             putStringKSymVHashTable(scope,dupString(&name),news);
             return news;
@@ -1014,7 +1026,7 @@ Expr* newDoubleExpr(double value) {
 }
 
 Sym* newDummyDeclSym() {
-    return newSym(NULL,CLIKE_DECL,-1,-1,NULL,NULL,NULL,-1,NULL);
+    return newSym(NULL,CLIKE_DECL,-1,-1,NULL,NULL,NULL,-1,NULL,-1);
 }
 
 int hasReturnStmt(StmtList *stmt_list) {
@@ -1302,15 +1314,15 @@ void cleanUpScope() {
 
 /* construct a Sym object */
 Sym* newFProt(Type type,char *id,TypeList *type_list) {
-    return newSym(id,CLIKE_FUNC,0,type,type_list,NULL,NULL,-1,NULL);
+    return newSym(id,CLIKE_FUNC,0,type,type_list,NULL,NULL,-1,NULL,-1);
 }
 
 Sym* newVarDecl(Type type,String id,int array_size) {
-    return newSym(id,CLIKE_VAR,1,type,NULL,NULL,NULL,array_size,NULL);
+    return newSym(id,CLIKE_VAR,1,type,NULL,NULL,NULL,array_size,NULL,-1);
 }
 
 Sym* newFunctionHeader(Type type,String id,StringList *id_list) {
-    return newSym(id,CLIKE_FUNC,1,type,NULL,id_list,NULL,-1,NULL);
+    return newSym(id,CLIKE_FUNC,1,type,NULL,id_list,NULL,-1,NULL,-1);
 }
 
 SymList* setTypesSymList(SymList *list,Type type) {
@@ -1326,7 +1338,7 @@ SymList* stringListToSymList(StringList *string_list) {
     StringNode *node;
     for (node = string_list->head->next; node != NULL; node = node->next) {
         // String *dupstring = dupString(node->data);
-        appendSym(sym_list,newSym(*node->data,CLIKE_VAR,1,-1,NULL,NULL,NULL,-1,NULL));
+        appendSym(sym_list,newSym(*node->data,CLIKE_VAR,1,-1,NULL,NULL,NULL,-1,NULL,-1));
         // free(dupstring);
     }
     return sym_list;
@@ -1351,7 +1363,7 @@ void reconcileArgsCreateScope(Sym *func,SymList *decl_list) {
     // add all of the id parameters to the scope and add them to the parameter list at the same time
     for (string_node = func->args_id_list->head->next; string_node != NULL; string_node = string_node->next) {
         // String *dupstring = dupString(string_node->data);
-        Sym *newsym = newSym(*string_node->data,CLIKE_VAR,1,-1,NULL,NULL,NULL,-1,NULL);
+        Sym *newsym = newSym(*string_node->data,CLIKE_VAR,1,-1,NULL,NULL,NULL,-1,NULL,-1);
         // free(dupstring);
         appendSym(parameters,newsym);
         putStringKSymVHashTable(func->scope,dupString(string_node->data),newsym);
