@@ -1,8 +1,8 @@
 FLAGS=
 TEMPLATE_EXE="../Structures/template/template"
 
-clike: clike_funcs.c clike.tab.c clike.lex.c stringksymvhashtable.c typelist.c stringlist.c symlist.c exprlist.c stmtlist.c quadlistlist.c quadlist.c stringkstringvhashtable.c
-	gcc -Wall ${FLAGS} clike_funcs.c clike.lex.c -lfl -o $@ clike.tab.c stringksymvhashtable.c stringksymventrylist.c typelist.c stringlist.c symlist.c exprlist.c stmtlist.c quadlistlist.c quadlist.c stringkstringvhashtable.c stringkstringventrylist.c
+clike: clike_funcs.c clike.tab.c clike.lex.c stringksymvhashtable.c typelist.c stringlist.c symlist.c exprlist.c stmtlist.c quadlistlist.c quadlist.c stringkstringvhashtable.c instrlist.c
+	gcc -Wall ${FLAGS} clike_funcs.c clike.lex.c -lfl -o $@ clike.tab.c stringksymvhashtable.c stringksymventrylist.c typelist.c stringlist.c symlist.c exprlist.c stmtlist.c quadlistlist.c quadlist.c stringkstringvhashtable.c stringkstringventrylist.c instrlist.c
 
 clike.lex.c: clike.tab.c clike.l
 	flex -o clike.lex.c clike.l
@@ -36,6 +36,9 @@ stringkstringvhashtable.c: stringkstringvhashtable_imp.h
 
 quadlist.c: quadlist_imp.h
 	${TEMPLATE_EXE} -l Quad
+
+instrlist.c: instrlist_imp.h
+	${TEMPLATE_EXE} -l Instr
 
 .PHONY: clean 
 

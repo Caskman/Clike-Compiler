@@ -34,11 +34,11 @@ typedef struct sym Sym;
 // branch uses src,intcon,op,string
 // labels use string
 // indexed assignments use dest,src,src2
-// enter uses intcon
-// param uses src,intcon; intcon is zero-indexed
-// call uses string
-// retval uses src
-// retrieve uses dest
+// enter uses intcon,src; intcon is bytes for temp vars, src is for the calling function
+// param uses src,intcon,op; intcon is zero-indexed and for the index, op is for the receiving type;
+// call uses src
+// retval uses src,op; op is for the transmitting type
+// retrieve uses dest,op; op is for the transmitting type
 // global uses src
 typedef struct quad {
     int type,op,intcon;

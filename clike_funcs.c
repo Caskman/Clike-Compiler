@@ -18,6 +18,8 @@
 #include "quadlistlist.h"
 #include "stringkstringvhashtable.h"
 #include "stringkstringvhashtable_imp.h"
+#include "instrlist_imp.h"
+#include "instrlist.h"
 
 int line = 1;
 int inComments = 0;
@@ -49,6 +51,12 @@ String* dupString(String *data) {
     *s = (char*)malloc((sizeof(char)*strlen(*data)) + 1);
     strcpy(*s,*data);
     return s;
+}
+
+String dupStringWoP(String s) {
+    String news = (String) malloc(sizeof(char)*(strlen(s) + 1));
+    strcpy(news,s);
+    return news;
 }
 
 unsigned int hashString(String *key) {
@@ -265,7 +273,7 @@ void printQuad(Quad *data) {
     case QUAD_INDX_L: printf("\t%s[%s] := %s\n",data->dest->id,data->src->id,data->src2->id); break;
     case QUAD_INDX_R: printf("\t%s := %s[%s]\n",data->dest->id,data->src->id,data->src2->id); break;
     case QUAD_PARAM: printf("\tparam %s,%d\n",data->src->id,data->intcon); break;
-    case QUAD_CALL: printf("\tcall %s\n",data->string); break;
+    case QUAD_CALL: printf("\tcall %s\n",data->src->id); break;
     case QUAD_RETVAL: printf("\tretval %s\n",data->src->id); break;
     case QUAD_RETURN: printf("\treturn\n"); break;
     case QUAD_RETRIEVE: printf("\tretrieve %s\n",data->dest->id); break;
@@ -307,6 +315,238 @@ Quad* newDummyQuad(char *s) {
 
 //======================================
 
+//================Instr=============================
+
+
+void printInstr(Instr *data) {
+    switch (data->type) {
+    case INSTR_COMMENT:
+        printf("\t# %s\n",data->src); break;
+    }
+}
+
+void freeInstr(Instr *data) {
+    if (data != NULL) free(data);
+}
+
+Instr* dupInstr(Instr *data) {
+    return NULL;
+}
+
+int compareInstr(Instr *a,Instr *b) {
+    return 0;
+}
+
+Instr* newInstr(int type,String dest,String src,String src2,int i) {
+    Instr *newi = (Instr*)malloc(sizeof(Instr));
+    newi->type = type;
+    newi->dest = dest;
+    newi->src = src;
+    newi->src2 = src2;
+    newi->i = i;
+    return newi;
+}
+
+
+
+//======================================
+
+//================MISC=============================
+
+String toStr(int i) {
+    int size = 1,temp,j;
+    for (temp = i/10; temp != 0; temp /= 10,size++); // get num digits
+
+    // create string buffer and set null char
+    char *s = (char*)malloc(sizeof(char)*(size+1));
+    s[size] = '\0';
+
+    // set each digit
+    for (j = size - 1,temp = i; j >= 0; j--, temp /= 10) {
+        s[j] = (temp % 10) + '0';
+    }
+    return s;
+}
+
+//======================================
+
+// TODO
+// finish std lib implementations, still need to do todouble
+// then resolve compile errors and move on
+
+//================FINAL CODE GENERATION=============================
+
+InstrList* genRetrieveCode(Quad *quad) {
+
+    // QUAD_RETRIEVE
+
+    return makeSEInstrList(newInstr(INSTR_COMMENT,NULL,dupStringWoP("retrieve a return value..."),NULL,-1));
+}
+
+InstrList* genRetValCode(Quad *quad) {
+
+    // QUAD_RETVAL
+
+    return makeSEInstrList(newInstr(INSTR_COMMENT,NULL,dupStringWoP("set a var as a return value..."),NULL,-1));
+}
+
+InstrList* genParamCode(Quad *quad) {
+
+    // QUAD_PARAM
+
+    return makeSEInstrList(newInstr(INSTR_COMMENT,NULL,dupStringWoP("assign a parameter..."),NULL,-1));
+}
+
+InstrList* genIndexCode(Quad *quad) {
+
+    // QUAD_INDX_L
+    // QUAD_INDX_R
+
+    return makeSEInstrList(newInstr(INSTR_COMMENT,NULL,dupStringWoP("index assign a var..."),NULL,-1));
+}
+
+InstrList* genLabelCode(Quad *quad) {
+
+    // QUAD_LABEL
+
+    return makeSEInstrList(newInstr(INSTR_COMMENT,NULL,dupStringWoP("label..."),NULL,-1));
+}
+
+InstrList* genBranchCode(Quad *quad) {
+
+    // QUAD_BRANCH
+
+    return makeSEInstrList(newInstr(INSTR_COMMENT,NULL,dupStringWoP("branch somewhere..."),NULL,-1));
+}
+
+InstrList* genJumpCode(Quad *quad) {
+
+    // QUAD_GOTO
+    // QUAD_CALL
+    // on call, you need to save the temporary registers ($t0,$t1,$t2) and then restore them afterwards
+
+    // QUAD_RETURN
+
+    return makeSEInstrList(newInstr(INSTR_COMMENT,NULL,dupStringWoP("jump somewhere..."),NULL,-1));
+}
+
+InstrList* genAssgCode(Quad *quad) {
+
+    // QUAD_MV
+    // QUAD_ASSG
+
+    return makeSEInstrList(newInstr(INSTR_COMMENT,NULL,dupStringWoP("assign a var..."),NULL,-1));
+}
+
+InstrList* genInvCode(Quad *quad) {
+
+    // QUAD_NEG
+    // QUAD_INV
+
+    return makeSEInstrList(newInstr(INSTR_COMMENT,NULL,dupStringWoP("invert a var..."),NULL,-1));
+}
+
+InstrList* genInitCode(Quad *quad) {
+
+    // QUAD_INIT_INT
+    // QUAD_INIT_DOUBLE
+
+    return makeSEInstrList(newInstr(INSTR_COMMENT,NULL,dupStringWoP("init a var..."),NULL,-1));
+}
+
+void errorMIPSGen(String s) {
+    fprintf(stderr,"\tERROR QUAD SWITCH TO MIPS %s\n",s);
+}
+
+InstrList* generateFunctionMIPSCode(QuadList *function_code) {
+    QuadNode *qnode;
+    InstrList *function_list = newInstrList(),*temp_list;
+    for (qnode = function_code->head->next; qnode != NULL; qnode = qnode->next) {
+        switch (qnode->data->type) {
+        case QUAD_INIT_INT:
+        case QUAD_INIT_DOUBLE:
+            temp_list = genInitCode(qnode->data); break;
+        case QUAD_NEG:
+        case QUAD_INV:
+            temp_list = genInvCode(qnode->data); break;
+        case QUAD_MV:
+        case QUAD_ASSG:
+            temp_list = genAssgCode(qnode->data); break;
+        case QUAD_GOTO:
+        case QUAD_CALL:
+        case QUAD_RETURN:
+            temp_list = genJumpCode(qnode->data); break;
+        case QUAD_BRANCH:
+            temp_list = genBranchCode(qnode->data); break;
+        case QUAD_LABEL:
+            temp_list = genLabelCode(qnode->data); break;
+        case QUAD_INDX_L:
+        case QUAD_INDX_R:
+            temp_list = genIndexCode(qnode->data); break;
+        case QUAD_PARAM:
+            temp_list = genParamCode(qnode->data); break;
+        case QUAD_RETVAL:
+            temp_list = genRetValCode(qnode->data); break;
+        case QUAD_RETRIEVE:
+            temp_list = genRetrieveCode(qnode->data); break;
+        case QUAD_ENTER:
+            temp_list = newInstrList(); break;
+        default:
+            if (qnode->data->type == QUAD_GLOBAL) errorMIPSGen("global");
+            else if (qnode->data->type == QUAD_DUMMY) errorMIPSGen("dummy");
+            else errorMIPSGen("unknown");
+            break;
+        }
+        appendInstrListToListShallow(function_list,temp_list);
+        freeInstrListOnly(temp_list);
+    }
+
+
+    return function_list;
+}
+
+InstrList* generateGlobalMIPSCode(QuadList *globals) {
+
+    //TODO generate global instructions
+
+    return newInstrList();
+}
+
+void printStdLibs() {
+
+    // TODO print standard libraries from their files
+
+}
+
+int isGlobalList(QuadList *qlist) {
+    if (qlist->size > 0 && qlist->head->next->data->type == QUAD_GLOBAL) return 1;
+    else return 0;
+}
+
+void generateMIPS(QuadListList *code) {
+    InstrList *final_code = newInstrList(),*instrs;
+    QuadListNode *qlnode;
+    for (qlnode = code->head->next; qlnode != NULL; qlnode = qlnode->next) {
+        if (isGlobalList(qlnode->data)) {
+            instrs = generateGlobalMIPSCode(qlnode->data);
+        } else instrs = generateFunctionMIPSCode(qlnode->data);
+        appendInstrListToListShallow(final_code,instrs);
+        freeInstrListOnly(instrs);
+    }
+
+
+
+    printInstrList(final_code);
+    printStdLibs();
+
+    freeInstrListOnly(final_code);
+}
+
+
+
+
+//======================================
+
 
 //================INTERMEDIATE CODE GENERATION=============================
 
@@ -324,21 +564,6 @@ int getSymBytes(Sym *sym) {
     if (sym->type == CHAR) return 1;
     else if (sym->type == DOUBLE_DECL) return 8;
     else return 4;
-}
-
-String toStr(int i) {
-    int size = 1,temp,j;
-    for (temp = i/10; temp != 0; temp /= 10,size++); // get num digits
-
-    // create string buffer and set null char
-    char *s = (char*)malloc(sizeof(char)*(size+1));
-    s[size] = '\0';
-
-    // set each digit
-    for (j = size - 1,temp = i; j >= 0; j--, temp /= 10) {
-        s[j] = (temp % 10) + '0';
-    }
-    return s;
 }
 
 Sym* getTempSym(StringKSymVHashTable *scope,int *locals_bytes,Type type) {
@@ -501,6 +726,7 @@ QuadList* generateFuncCallQuadList(Sym *callee,ExprList *arg_list,Sym *func,int 
     QuadList *list = newQuadList(),*parameter_quad;
     QuadListList *parameter_quads = newQuadListList();
     ExprNode *enode; QuadListNode *qnode; int i; Sym *result,*tempdest;
+    TypeNode *tnode;
 
     // evaluate each parameter
     for (enode = arg_list->head->next; enode != NULL; enode = enode->next) {
@@ -510,17 +736,18 @@ QuadList* generateFuncCallQuadList(Sym *callee,ExprList *arg_list,Sym *func,int 
     }
 
     // set parameters
-    for (i = 0, qnode = parameter_quads->head->next; qnode != NULL; qnode = qnode->next) {
+    for (i = 0, qnode = parameter_quads->head->next, tnode = callee->args_type_list->head->next;
+         qnode != NULL; qnode = qnode->next, tnode = tnode->next) {
         result = getValueDest(qnode->data);
-        appendQuad(list,newQuad(QUAD_PARAM,NULL,result,NULL,NULL,-1,i,0.0)); // set parameter
+        appendQuad(list,newQuad(QUAD_PARAM,NULL,result,NULL,NULL,*tnode->data,i,0.0)); // set parameter
         freeQuadListOnly(qnode->data);
     }
 
     freeQuadListListOnly(parameter_quads);
-    appendQuad(list,newQuad(QUAD_CALL,NULL,NULL,NULL,callee->id,-1,-1,0.0)); // call function
+    appendQuad(list,newQuad(QUAD_CALL,NULL,callee,NULL,NULL,-1,-1,0.0)); // call function
     if (callee->type != VOID) {
         tempdest = getTempSym(func->scope,locals_bytes,callee->type); // create temp
-        appendQuad(list,newQuad(QUAD_RETRIEVE,tempdest,NULL,NULL,NULL,-1,-1,0.0)); // retrieve return value
+        appendQuad(list,newQuad(QUAD_RETRIEVE,tempdest,NULL,NULL,NULL,callee->type,-1,0.0)); // retrieve return value
     }
 
 
@@ -722,7 +949,7 @@ QuadList* generateFuncQuadList(Sym *func,StringKStringVHashTable *labels) {
     // and their size added to the locals_bytes
     QuadList *stmt_quads = generateStmtListQuadList(func->body,func,&locals_bytes,labels);
 
-    prependQuad(stmt_quads,newQuad(QUAD_ENTER,NULL,NULL,NULL,NULL,-1,locals_bytes,0.0));
+    prependQuad(stmt_quads,newQuad(QUAD_ENTER,NULL,func,NULL,NULL,-1,locals_bytes,0.0));
     prependQuad(stmt_quads,newQuad(QUAD_LABEL,NULL,NULL,NULL,func->id,-1,-1,0.0));
 
 
@@ -764,7 +991,7 @@ void generateCode(SymList *funcs) {
 
     if (print_quads) printQuadListList(functioncode);
     else {
-
+        generateMIPS(functioncode);
     }
 
     QuadListNode *qnode;

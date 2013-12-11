@@ -8,6 +8,6 @@ then
 	exit 1
 fi
 
-valgrind --leak-check=full parse &> valgrindtest.output
+valgrind --leak-check=full clike &> valgrindtest.output
 
 
