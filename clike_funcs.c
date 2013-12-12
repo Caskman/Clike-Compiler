@@ -981,7 +981,12 @@ QuadList* generateFuncQuadList(Sym *func,StringKStringVHashTable *labels) {
 
 Quad* generateGlobalQuad(Sym *global,StringKStringVHashTable *labels) {
 
+    String prefix = "cask";
 
+    String new_id = (String)malloc(sizeof(char)*(strlen(prefix) + strlen(global->id) + 1));
+    strcpy(new_id,prefix);
+    strcat(new_id,global->id);
+    global->id = new_id;
 
     return newQuad(QUAD_GLOBAL,NULL,global,NULL,NULL,-1,-1,0.0);
 }
