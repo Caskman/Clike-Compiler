@@ -71,6 +71,13 @@ unsigned int hashString(String *key) {
     return hashvalue;
 }
 
+String catDupWoP(String a,String b) {
+    String news = (String)malloc(sizeof(char)*(strlen(a) + strlen(b) + 1));
+    strcpy(news,a);
+    strcat(news,b);
+    return news;
+}
+
 //==========================================
 
 //================Sym================
@@ -321,8 +328,33 @@ Quad* newDummyQuad(char *s) {
 
 void printInstr(Instr *data) {
     switch (data->type) {
-    case INSTR_COMMENT:
-        printf("\t# %s\n",data->src); break;
+    case INSTR_COMMENT: printf("\t# %s\n",data->src); break;
+    case INSTR_DATA: printf(".data\n"); break;
+    case INSTR_TEXT: printf(".text\n"); break;
+    case INSTR_DOUBLE:
+    case INSTR_INT:
+        printf("\t%s: ",data->src);
+        if (data->type == INSTR_DOUBLE) printf(".double ");
+        else if (data->type == INSTR_INT) printf(".word ");
+        if (data->i == -1) {
+            if (data->type == INSTR_DOUBLE) printf("%f ",0.0);
+            else if (data->type == INSTR_INT) printf("%d ",0);
+        } else {
+            int i; for (i = 0; i < data->i; i++) {
+                if (data->type == INSTR_DOUBLE) printf("%f ",0.0);
+                else if (data->type == INSTR_INT) printf("%d ",0);
+            }
+        }
+        printf("\n");
+        break;
+    case INSTR_SW: printf("\tsw %s,%d(%s)\n",data->src,data->i,data->src2); break;
+    case INSTR_LW: printf("\tlw %s,%d(%s)\n",data->dest,data->i,data->src); break;
+    case INSTR_ADDU: printf("\taddu %s,%s,%d\n",data->dest,data->src,data->i); break;
+    case INSTR_SUBU: printf("\tsubu %s,%s,%d\n",data->dest,data->src,data->i); break;
+    case INSTR_LABEL: printf("%s:\n",data->src); break;
+    case INSTR_JR: printf("\tjr $ra\n"); break;
+    default:
+        fprintf(stderr,"\tINSTR PRINTING ERROR\n"); break;
     }
 }
 
@@ -347,6 +379,17 @@ Instr* newInstr(int type,String dest,String src,String src2,int i) {
     newi->i = i;
     return newi;
 }
+
+Instr* newInstrComment(String a) {
+    return newInstr(INSTR_COMMENT,NULL,a,NULL,-1);
+}
+
+Instr* newInstrCommentDup(String a) {
+    String newa = (String)malloc(sizeof(char)*(strlen(a) + 1));
+    strcpy(newa,a);
+    return newInstrComment(newa);
+}
+
 
 
 
@@ -379,25 +422,61 @@ String toStr(int i) {
 
 //================FINAL CODE GENERATION=============================
 
+String reg_a0 = "$a0";
+String reg_a1 = "$a1";
+String reg_a2 = "$a2";
+String reg_a3 = "$a3";
+String reg_sp = "$sp";
+String reg_ra = "$ra";
+String reg_fp = "$fp";
+String reg_t0 = "$fp";
+String reg_t1 = "$fp";
+String reg_t2 = "$fp";
+String error_reg = "ERROR REG";
+
+String get_sp_reg() {return reg_sp;}
+String get_fp_reg() {return reg_fp;}
+String get_ra_reg() {return reg_ra;}
+String get_arg_reg(int i) {
+    switch (i) {
+        case 0: return reg_a0;
+        case 1: return reg_a1;
+        case 2: return reg_a2;
+        case 3: return reg_a3;
+        default: return error_reg;
+    }
+}
+String get_t_reg(int i) {
+    switch (i) {
+    case 0: return reg_t0;
+    case 1: return reg_t1;
+    case 2: return reg_t2;
+    default: return error_reg;
+    }
+}
+
+
+
+
 InstrList* genRetrieveCode(Quad *quad) {
 
     // QUAD_RETRIEVE
 
-    return makeSEInstrList(newInstr(INSTR_COMMENT,NULL,dupStringWoP("retrieve a return value..."),NULL,-1));
+    return makeSEInstrList(newInstrCommentDup("retrieve a return value..."));
 }
 
 InstrList* genRetValCode(Quad *quad) {
 
     // QUAD_RETVAL
 
-    return makeSEInstrList(newInstr(INSTR_COMMENT,NULL,dupStringWoP("set a var as a return value..."),NULL,-1));
+    return makeSEInstrList(newInstrCommentDup("set a var as a return value..."));
 }
 
 InstrList* genParamCode(Quad *quad) {
 
     // QUAD_PARAM
 
-    return makeSEInstrList(newInstr(INSTR_COMMENT,NULL,dupStringWoP("assign a parameter..."),NULL,-1));
+    return makeSEInstrList(newInstrCommentDup("assign a parameter..."));
 }
 
 InstrList* genIndexCode(Quad *quad) {
@@ -405,29 +484,29 @@ InstrList* genIndexCode(Quad *quad) {
     // QUAD_INDX_L
     // QUAD_INDX_R
 
-    return makeSEInstrList(newInstr(INSTR_COMMENT,NULL,dupStringWoP("index assign a var..."),NULL,-1));
+    return makeSEInstrList(newInstrCommentDup("index assign a var..."));
 }
 
 InstrList* genLabelCode(Quad *quad) {
 
     // QUAD_LABEL
 
-    return makeSEInstrList(newInstr(INSTR_COMMENT,NULL,dupStringWoP("label..."),NULL,-1));
+    return makeSEInstrList(newInstrCommentDup("label..."));
 }
 
 InstrList* genBranchCode(Quad *quad) {
 
     // QUAD_BRANCH
 
-    return makeSEInstrList(newInstr(INSTR_COMMENT,NULL,dupStringWoP("branch somewhere..."),NULL,-1));
+    return makeSEInstrList(newInstrCommentDup("branch somewhere..."));
 }
 
 InstrList* genJumpCode(Quad *quad) {
 
     // QUAD_GOTO
-    // QUAD_CALL
+    // QUAD_CALL make sure to pop the stack if there are args on the stack
 
-    return makeSEInstrList(newInstr(INSTR_COMMENT,NULL,dupStringWoP("jump somewhere..."),NULL,-1));
+    return makeSEInstrList(newInstrCommentDup("jump somewhere..."));
 }
 
 InstrList* genAssgCode(Quad *quad) {
@@ -435,7 +514,7 @@ InstrList* genAssgCode(Quad *quad) {
     // QUAD_MV
     // QUAD_ASSG
 
-    return makeSEInstrList(newInstr(INSTR_COMMENT,NULL,dupStringWoP("assign a var..."),NULL,-1));
+    return makeSEInstrList(newInstrCommentDup("assign a var..."));
 }
 
 InstrList* genInvCode(Quad *quad) {
@@ -443,15 +522,19 @@ InstrList* genInvCode(Quad *quad) {
     // QUAD_NEG
     // QUAD_INV
 
-    return makeSEInstrList(newInstr(INSTR_COMMENT,NULL,dupStringWoP("invert a var..."),NULL,-1));
+    return makeSEInstrList(newInstrCommentDup("invert a var..."));
 }
 
 InstrList* genInitCode(Quad *quad) {
 
+    InstrList *list = newInstrList();
+
+    // appendInstr(list,newInstrCommentDup("init "));
+
     // QUAD_INIT_INT
     // QUAD_INIT_DOUBLE
 
-    return makeSEInstrList(newInstr(INSTR_COMMENT,NULL,dupStringWoP("init a var..."),NULL,-1));
+    return list;
 }
 
 void errorMIPSGen(String s) {
@@ -459,19 +542,70 @@ void errorMIPSGen(String s) {
 }
 
 InstrList* generateFunctionMIPSCode(QuadList *function_code) {
+    if (function_code->size <= 3) return newInstrList();
     QuadNode *qnode;
     InstrList *function_list = newInstrList(),*temp_list;
-    // Quad *enterquad = functioncode->head->next->data;
+    Quad *enterquad = function_code->head->next->next->data;
+    Sym *func_sym = enterquad->src;
     // create prototype
     // create space on the stack, save $fp and $ra, and update $fp
-    // appendInstr(function_list,newInstr(INSTR_SUBU,get_sp_reg(),get_sp_reg(),toStr(enterquad->intcon + 8))); // subu $sp,$sp,(8+locals_bytes)
-    // appendInstr(function_list,newInstr(INSTR_SW,NULL,get_ra_reg(),get_sp_reg(),4)); // sw $ra,4($sp)
-    // appendInstr(function_list,newInstr(INSTR_SW,NULL,get_fp_reg(),get_sp_reg(),0)); // sw $fp,0($sp)
-    // appendInstr(function_list,newInstr(INSTR_ADDU,get_fp_reg(),get_sp_reg(),toStr(enterquad->intcon + 4))); // addu $fp,$sp,(4 + locals_bytes)
+    appendInstr(function_list,newInstr(INSTR_LABEL,NULL,function_code->head->next->data->string,NULL,-1));
+    appendInstr(function_list,newInstrCommentDup("prologue"));
+    appendInstr(function_list,newInstr(INSTR_SUBU,get_sp_reg(),get_sp_reg(),NULL,enterquad->intcon + 8)); // subu $sp,$sp,(8+locals_bytes)
+    appendInstr(function_list,newInstr(INSTR_SW,NULL,get_ra_reg(),get_sp_reg(),4)); // sw $ra,4($sp)
+    appendInstr(function_list,newInstr(INSTR_SW,NULL,get_fp_reg(),get_sp_reg(),0)); // sw $fp,0($sp)
+    appendInstr(function_list,newInstr(INSTR_ADDU,get_fp_reg(),get_sp_reg(),NULL,enterquad->intcon + 4)); // addu $fp,$sp,(4 + locals_bytes)
+
+    // create local variable offsets from frame pointer
+    StringKSymVEntryList *splats = splatStringKSymVHashTable(func_sym->scope);
+    StringKSymVEntryNode *enode; int offset;
+    for (offset = 0, enode = splats->head->next; enode != NULL; enode = enode->next) {
+        if (enode->data->value->type == DOUBLE_DECL) {
+            enode->data->value->offset = offset - 4;
+            offset -= 8;
+        } else if (enode->data->value->type == INT || enode->data->value->type == CHAR) {
+            enode->data->value->offset = offset;
+            offset -= 4;
+        }
+    }
+
+    appendInstr(function_list,newInstrCommentDup("init args"));
+    // retrieve argument values and init the local vars to those values
+    StringNode *snode; int i,total_num_args = func_sym->args_id_list->size;
+    for (i = 1, snode = func_sym->args_id_list->head->next; snode != NULL; i++, snode = snode->next) {
+        Sym *sym = getValueStringKSymVHashTable(func_sym->scope,snode->data);
+        appendInstr(function_list,newInstrComment(catDupWoP("init ",sym->id)));
+        int argoffset = 4*(total_num_args - i + 1);
+        String arg_reg = get_arg_reg(i-1);
+
+        if (sym->type == DOUBLE_DECL) {
+            String addr_reg;
+            if (i <= 4) {
+                addr_reg = arg_reg;
+            } else {
+                addr_reg = get_t_reg(1);
+                appendInstr(function_list,newInstr(INSTR_LW,addr_reg,get_fp_reg(),NULL,argoffset)); // lw $t1,argoffset($fp)
+            }
+            appendInstr(function_list,newInstr(INSTR_LW,get_t_reg(0),addr_reg,NULL,0)); // lw $t0,0(addr_reg)
+            appendInstr(function_list,newInstr(INSTR_SW,NULL,get_t_reg(0),get_fp_reg(),sym->offset)); // sw $t0,offset($fp)
+            appendInstr(function_list,newInstr(INSTR_LW,get_t_reg(0),addr_reg,NULL,4)); // lw $t0,4(addr_reg)
+            appendInstr(function_list,newInstr(INSTR_SW,NULL,get_t_reg(0),get_fp_reg(),sym->offset+4)); // sw $t0,offset+4($fp)
+        } else if (sym->type == INT || sym->type == CHAR) {
+            String src_reg;
+            if (i <= 4) {
+                src_reg = arg_reg;
+            } else {
+                appendInstr(function_list,newInstr(INSTR_LW,get_t_reg(0),get_fp_reg(),NULL,argoffset)); // lw $t0,argoffset($fp)
+                src_reg = get_t_reg(0);
+            }
+            appendInstr(function_list,newInstr(INSTR_SW,NULL,src_reg,get_fp_reg(),sym->offset));// sw src_reg,offset($fp)
+        } else {
+            fprintf(stderr,"\tERROR INIT ARG VARS\n");
+        }
+    }
 
 
-
-    for (qnode = function_code->head->next; qnode != NULL; qnode = qnode->next) {
+    for (qnode = function_code->head->next->next->next; qnode != NULL; qnode = qnode->next) {
         switch (qnode->data->type) {
         case QUAD_INIT_INT:
         case QUAD_INIT_DOUBLE:
@@ -511,15 +645,34 @@ InstrList* generateFunctionMIPSCode(QuadList *function_code) {
         freeInstrListOnly(temp_list);
     }
 
+    appendInstr(function_list,newInstrCommentDup("epilogue"));
+    appendInstr(function_list,newInstr(INSTR_LW,get_fp_reg(),get_sp_reg(),NULL,0)); // lw $fp,fp_offset($sp)
+    appendInstr(function_list,newInstr(INSTR_LW,get_ra_reg(),get_sp_reg(),NULL,4)); // lw $ra,ra_offset($sp)
+    appendInstr(function_list,newInstr(INSTR_ADDU,get_sp_reg(),get_sp_reg(),NULL,enterquad->intcon + 8)); // addu $sp,$sp,stack_size
+    appendInstr(function_list,newInstr(INSTR_JR,NULL,NULL,NULL,-1)); // jr $ra
 
     return function_list;
 }
 
 InstrList* generateGlobalMIPSCode(QuadList *globals) {
 
-    //TODO generate global instructions
+    InstrList *list = newInstrList();
 
-    return newInstrList();
+    appendInstr(list,newInstr(INSTR_DATA,NULL,NULL,NULL,-1));
+
+    QuadNode *gnode;
+    for (gnode = globals->head->next; gnode != NULL; gnode = gnode->next) {
+        int type;
+        if (gnode->data->src->type == DOUBLE_DECL) type = INSTR_DOUBLE;
+        else if (gnode->data->src->type == INT || gnode->data->src->type == CHAR) type = INSTR_INT;
+        else fprintf(stderr,"\tERROR SELECTING GLOBAL TYPE\n");
+
+        appendInstr(list,newInstr(type,NULL,gnode->data->src->id,NULL,gnode->data->src->array_size));
+    }
+
+    appendInstr(list,newInstr(INSTR_TEXT,NULL,NULL,NULL,-1));
+
+    return list;
 }
 
 void printStdLibs() {
@@ -571,7 +724,7 @@ Sym* getValueDest(QuadList *list) { // bugs in template list's previous referenc
 }
 
 int getSymBytes(Sym *sym) {
-    if (sym->type == CHAR) return 1;
+    if (sym->type == CHAR) return 4;
     else if (sym->type == DOUBLE_DECL) return 8;
     else return 4;
 }
@@ -1049,7 +1202,7 @@ void generateCode(SymList *funcs) {
     SymNode *snode;
     for (snode = funcs->head->next; snode != NULL; snode = snode->next) {
 
-        if (snode->data->sym_type == CLIKE_FUNC) {
+        if (snode->data->sym_type == CLIKE_FUNC && snode->data->is_defined) {
             QuadList *quad_list = generateFuncQuadList(snode->data,labels);
             appendQuadList(functioncode,quad_list);
         }
