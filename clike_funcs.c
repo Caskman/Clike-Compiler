@@ -542,7 +542,7 @@ void errorMIPSGen(String s) {
 }
 
 InstrList* generateFunctionMIPSCode(QuadList *function_code) {
-    if (function_code->size <= 3) return newInstrList();
+    if (function_code->size < 3) return newInstrList();
     QuadNode *qnode;
     InstrList *function_list = newInstrList(),*temp_list;
     Quad *enterquad = function_code->head->next->next->data;
