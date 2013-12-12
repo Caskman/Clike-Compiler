@@ -278,7 +278,7 @@ void printQuad(Quad *data) {
     case QUAD_RETVAL: printf("\tretval %s\n",data->src->id); break;
     case QUAD_RETURN: printf("\treturn\n"); break;
     case QUAD_RETRIEVE: printf("\tretrieve %s\n",data->dest->id); break;
-    case QUAD_GLOBAL: printf("\tglobal %s %s[%d]\n",getTypeString(data->src->type),data->src->id,data->src->array_size); break;
+    case QUAD_GLOBAL: printf("global %s %s[%d]\n",getTypeString(data->src->type),data->src->id,data->src->array_size); break;
     default: printf("ERROR ERROR ERROR\n"); break;
     }
 }
@@ -427,8 +427,6 @@ InstrList* genJumpCode(Quad *quad) {
     // QUAD_GOTO
     // QUAD_CALL
 
-    // QUAD_RETURN
-
     return makeSEInstrList(newInstr(INSTR_COMMENT,NULL,dupStringWoP("jump somewhere..."),NULL,-1));
 }
 
@@ -486,7 +484,6 @@ InstrList* generateFunctionMIPSCode(QuadList *function_code) {
             temp_list = genAssgCode(qnode->data); break;
         case QUAD_GOTO:
         case QUAD_CALL:
-        case QUAD_RETURN:
             temp_list = genJumpCode(qnode->data); break;
         case QUAD_BRANCH:
             temp_list = genBranchCode(qnode->data); break;
@@ -501,6 +498,7 @@ InstrList* generateFunctionMIPSCode(QuadList *function_code) {
             temp_list = genRetValCode(qnode->data); break;
         case QUAD_RETRIEVE:
             temp_list = genRetrieveCode(qnode->data); break;
+        case QUAD_RETURN:
         case QUAD_ENTER:
             temp_list = newInstrList(); break;
         default:
@@ -526,7 +524,7 @@ InstrList* generateGlobalMIPSCode(QuadList *globals) {
 
 void printStdLibs() {
 
-    // TODO print standard libraries from their files
+    printf("printint: # arg goes in $a0\n\tli $v0,1\n\tsyscall\n\tjr $ra\nprintchar: # arg goes in $a0\n\tli $v0,11\n\tsyscall\n\tjr $ra\nprintdouble: # arg address goes in $a0\n\tlwc1 $f12,0($a0)\n\tlwc1 $f13,4($a0)\n\tli $v0,3\n\tsyscall\n\tjr $ra\ntoint: # arg address goes in $a0, result goes in $v0\n\tlwc1 $f12,0($a0)\n\tlwc1 $f13,4($a0)\n\tfloor.w.d $f12,$f12\n\tcvt.w.d $f12,$f12\n\tmfc1 $v0,$f12\n\tjr $ra\ntodouble: # arg address goes in $a0, result will be in $v0 and $v1\n\tmtc1 $a0,$f12\n\tcvt.d.w $f12,$f12\n\tmfc1 $v0,$f12\n\tmfc1 $v1,$f13\n\tjr $ra\n");
 
 }
 
@@ -970,13 +968,54 @@ QuadList* generateFuncQuadList(Sym *func,StringKStringVHashTable *labels) {
     return stmt_quads;
 }
 
-Quad* generateGlobalQuad(Sym *global) {
+Quad* generateGlobalQuad(Sym *global,StringKStringVHashTable *labels) {
+
+
+
     return newQuad(QUAD_GLOBAL,NULL,global,NULL,NULL,-1,-1,0.0);
+}
+
+int isStdLibFunc(Sym *func) {
+    if (strcmp(func->id,"printint") == 0 && func->args_type_list->size == 1 && *func->args_type_list->head->next->data == INT) return 1;
+    if (strcmp(func->id,"printchar") == 0 && func->args_type_list->size == 1 && *func->args_type_list->head->next->data == CHAR) return 1;
+    if (strcmp(func->id,"printdouble") == 0 && func->args_type_list->size == 1 && *func->args_type_list->head->next->data == DOUBLE_DECL) return 1;
+    if (strcmp(func->id,"toint") == 0 && func->args_type_list->size == 1 && *func->args_type_list->head->next->data == DOUBLE_DECL) return 1;
+    if (strcmp(func->id,"todouble") == 0 && func->args_type_list->size == 1 && *func->args_type_list->head->next->data == INT) return 1;
+    return 0;
+}
+
+// int hasUndefinedPrototypes() {
+//     StringKSymVEntryList *globals = splatStringKSymVHashTable(global_sym_table);
+//     StringKSymVEntryNode *snode;
+//     for (snode = globals->head->next; snode != NULL; snode = snode->next) {
+//         if (!snode->data->value->is_defined && snode->data->value->sym_type == CLIKE_FUNC) {
+//             if (!isStdLibFunc(snode->data->value)) {
+//                 fprintf(stderr,"\tfunction <%s> is undefined\n",snode->data->value->id);
+//                 return 1;
+//             }
+//         }
+//     }
+//     return 0;
+// }
+
+int hasMainFunc() {
+    StringKSymVEntryList *globals = splatStringKSymVHashTable(global_sym_table);
+    StringKSymVEntryNode *snode;
+    for (snode = globals->head->next; snode != NULL; snode = snode->next) {
+        if (snode->data->value->sym_type == CLIKE_FUNC && snode->data->value->is_defined && strcmp(snode->data->value->id,"main") == 0) {
+            return 1;
+        }
+    }
+    fprintf(stderr,"\tNo main function defined\n");
+    return 0;
 }
 
 void generateCode(SymList *funcs) {
     if (error_thrown) return;
+    else if (!hasMainFunc()) return;
+    // else if (hasUndefinedPrototypes()) return;
     QuadListList *functioncode = newQuadListList();
+    StringKStringVHashTable *labels = newStringKStringVHashTable(5);
 
     // generate global quads first
     QuadList *global_quads = newQuadList(); Quad *global;
@@ -984,14 +1023,13 @@ void generateCode(SymList *funcs) {
     StringKSymVEntryNode *ssnode;
     for (ssnode = global_list->head->next; ssnode != NULL; ssnode = ssnode->next) {
         if (ssnode->data->value->sym_type == CLIKE_VAR) {
-            global = generateGlobalQuad(ssnode->data->value);
+            global = generateGlobalQuad(ssnode->data->value,labels);
             appendQuad(global_quads,global);
         }
     }
     appendQuadList(functioncode,global_quads);
 
     // generate function quads
-    StringKStringVHashTable *labels = newStringKStringVHashTable(5);
     SymNode *snode;
     for (snode = funcs->head->next; snode != NULL; snode = snode->next) {
 
