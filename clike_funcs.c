@@ -950,8 +950,19 @@ QuadList* generateFuncQuadList(Sym *func,StringKStringVHashTable *labels) {
     StringKSymVEntryNode *ssnode;
     for (ssnode = scope_list->head->next; ssnode != NULL; ssnode = ssnode->next) locals_bytes += getSymBytes(ssnode->data->value);
 
+
+    String func_label;
+    if (strcmp(func->id,"main") == 0) {
+        func_label = func->id;
+    } else {
+        String prefix = "cask";
+        func_label = (String)malloc(sizeof(char)*(strlen(prefix) + strlen(func->id) + 1));
+        strcpy(func_label,prefix);
+        strcat(func_label,func->id);
+    }
     // generate label for the beginning of this function
-    putStringKStringVHashTable(labels,dupString(&func->id),&func->id);
+    putStringKStringVHashTable(labels,dupString(&func_label),dupString(&func_label));
+    Quad *label_quad = newQuad(QUAD_LABEL,NULL,NULL,NULL,func_label,-1,-1,0.0);
 
     // now generate quads for the function body
     // pass the function symbol and the address of the locals_bytes so that if temporaries 
@@ -960,7 +971,7 @@ QuadList* generateFuncQuadList(Sym *func,StringKStringVHashTable *labels) {
     QuadList *stmt_quads = generateStmtListQuadList(func->body,func,&locals_bytes,labels);
 
     prependQuad(stmt_quads,newQuad(QUAD_ENTER,NULL,func,NULL,NULL,-1,locals_bytes,0.0));
-    prependQuad(stmt_quads,newQuad(QUAD_LABEL,NULL,NULL,NULL,func->id,-1,-1,0.0));
+    prependQuad(stmt_quads,label_quad);
 
 
     if (stmt_quads->tail->data->type != QUAD_RETURN) appendQuad(stmt_quads,newQuad(QUAD_RETURN,NULL,NULL,NULL,NULL,-1,-1,0.0));
