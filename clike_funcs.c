@@ -355,9 +355,20 @@ void printInstr(Instr *data) {
     case INSTR_JR: printf("\tjr $ra\n"); break;
     case INSTR_JAL: printf("\tjal %s\n",data->src); break;
     case INSTR_LI: printf("\tli %s,%d\n",data->dest,data->i); break;
-    case INSTR_ADD: printf("\tadd %s,%s,%s\n",data->dest,data->src,data->src2); break;
     case INSTR_LA: printf("\tla %s,%s\n",data->dest,data->src); break;
     case INSTR_SLL: printf("\tsll %s,%s,%d\n",data->dest,data->src,data->i); break;
+    case INSTR_J: printf("\tj %s\n",data->src); break;
+    case INSTR_BEQ: printf("\tbeq %s,%s,%s\n",data->src,data->src2,data->dest); break;
+    case INSTR_ADD: printf("\tadd %s,%s,%s\n",data->dest,data->src,data->src2); break;
+    case INSTR_SUB: printf("\tsub %s,%s,%s\n",data->dest,data->src,data->src2); break;
+    case INSTR_MUL: printf("\tmul %s,%s,%s\n",data->dest,data->src,data->src2); break;
+    case INSTR_DIV: printf("\tdiv %s,%s,%s\n",data->dest,data->src,data->src2); break;
+    case INSTR_SEQ: printf("\tseq %s,%s,%s\n",data->dest,data->src,data->src2); break;
+    case INSTR_SNE: printf("\tsne %s,%s,%s\n",data->dest,data->src,data->src2); break;
+    case INSTR_SLE: printf("\tsle %s,%s,%s\n",data->dest,data->src,data->src2); break;
+    case INSTR_SGE: printf("\tsge %s,%s,%s\n",data->dest,data->src,data->src2); break;
+    case INSTR_SLT: printf("\tslt %s,%s,%s\n",data->dest,data->src,data->src2); break;
+    case INSTR_SGT: printf("\tsgt %s,%s,%s\n",data->dest,data->src,data->src2); break;
     default:
         fprintf(stderr,"\tINSTR PRINTING ERROR\n"); break;
     }
@@ -531,7 +542,6 @@ InstrList* genRetValCode(Quad *quad) {
     InstrList *list = newInstrList(),*temp;
 
     appendInstr(list,newInstrComment2("return ",quad->src->id));
-    // QUAD_RETVAL
     if (quad->op == INT || quad->op == CHAR) {
         appendInstrListToListShallow(list,temp = loadSymToReg(quad->src,get_v_reg(0))); freeInstrListOnly(temp); // load src to $t0
         // appendInstr(list,newInstr(INSTR_LW,get_v_reg(0),get_fp_reg(),NULL,quad->src->offset)); // lw $v0,src_offset($fp)
@@ -564,15 +574,11 @@ InstrList* genParamCode(Quad *quad) {
         } else fprintf(stderr,"ERROR GENERATING PARAMETER CODE\n");
     }
 
-
-    // QUAD_PARAM
-
     return list;
 }
 
 InstrList* genIndexCode(Quad *quad) {
     InstrList *list = newInstrList(),*temp;
-
 
     if (quad->type == QUAD_INDX_R) {
         appendInstr(list,newInstrComment4("assign indexed value from ",quad->src->id," to ",quad->dest->id));
@@ -605,17 +611,24 @@ InstrList* genIndexCode(Quad *quad) {
 }
 
 InstrList* genLabelCode(Quad *quad) {
-
-    // QUAD_LABEL
-
-    return makeSEInstrList(newInstrCommentDup("label..."));
+    return makeSEInstrList(newInstr(INSTR_LABEL,NULL,quad->string,NULL,-1));
 }
 
 InstrList* genBranchCode(Quad *quad) {
+    InstrList *list = newInstrList(),*temp;
+    appendInstr(list,newInstrComment4("branch to ",quad->string," on ",quad->src->id));
 
-    // QUAD_BRANCH
+    if (quad->src->type == INT || quad->src->type == CHAR) {
+        appendInstrListToListShallow(list,temp = loadSymToReg(quad->src,get_t_reg(0))); freeInstrListOnly(temp); // load src into $t0
+        appendInstr(list,newInstr(INSTR_LI,get_t_reg(1),NULL,NULL,quad->intcon)); // li $t1,intcon
+        appendInstr(list,newInstr(INSTR_BEQ,quad->string,get_t_reg(0),get_t_reg(1),-1)); // beq $t0,$t1,string
+    } else if (quad->src->type == DOUBLE_DECL) {
+        fprintf(stderr, "DOUBLE BRANCHES NOT IMPLEMENTED\n");
+    } else fprintf(stderr, "ERROR GENERATING BRANCH CODE\n");
 
-    return makeSEInstrList(newInstrCommentDup("branch somewhere..."));
+
+
+    return list;
 }
 
 InstrList* genJumpCode(Quad *quad) {
@@ -628,12 +641,10 @@ InstrList* genJumpCode(Quad *quad) {
         appendInstr(list,newInstr(INSTR_JAL,NULL,quad->src->id,NULL,-1)); // jal call
         appendInstr(list,newInstr(INSTR_ADDU,get_sp_reg(),get_sp_reg(),NULL,args_on_stack*4)); // addu $sp,$sp,args_on_stack*4
     } else if (quad->type == QUAD_GOTO) {
-        appendInstr(list,newInstrCommentDup("goto here..."));
+        appendInstr(list,newInstr(INSTR_J,NULL,quad->string,NULL,-1));
     } else {
         fprintf(stderr, "ERROR CREATING JUMP MIPS CODE\n");
     }
-    // QUAD_GOTO
-    // QUAD_CALL make sure to pop the stack if there are args on the stack
 
     return list;
 }
@@ -660,6 +671,15 @@ InstrList* genAssgCode(Quad *quad) {
             // appendInstr(list,newInstr(INSTR_LW,get_t_reg(1),get_fp_reg(),NULL,quad->src2->offset)); // lw $t1,src2_offset($fp)
             switch (quad->op) {
                 case '+': appendInstr(list,newInstr(INSTR_ADD,get_t_reg(0),get_t_reg(0),get_t_reg(1),-1)); break; // add $t0,$t0,$t1
+                case '-': appendInstr(list,newInstr(INSTR_SUB,get_t_reg(0),get_t_reg(0),get_t_reg(1),-1)); break; // sub $t0,$t0,$t1
+                case '*': appendInstr(list,newInstr(INSTR_MUL,get_t_reg(0),get_t_reg(0),get_t_reg(1),-1)); break; // mul $t0,$t0,$t1
+                case '/': appendInstr(list,newInstr(INSTR_DIV,get_t_reg(0),get_t_reg(0),get_t_reg(1),-1)); break; // div $t0,$t0,$t1
+                case D_EQ: appendInstr(list,newInstr(INSTR_SEQ,get_t_reg(0),get_t_reg(0),get_t_reg(1),-1)); break; // seq $t0,$t0,$t1
+                case NOT_EQ: appendInstr(list,newInstr(INSTR_SNE,get_t_reg(0),get_t_reg(0),get_t_reg(1),-1)); break; // sne $t0,$t0,$t1
+                case LESS_EQ: appendInstr(list,newInstr(INSTR_SLE,get_t_reg(0),get_t_reg(0),get_t_reg(1),-1)); break; // sle $t0,$t0,$t1
+                case GREAT_EQ: appendInstr(list,newInstr(INSTR_SGE,get_t_reg(0),get_t_reg(0),get_t_reg(1),-1)); break; // sge $t0,$t0,$t1
+                case '<': appendInstr(list,newInstr(INSTR_SLT,get_t_reg(0),get_t_reg(0),get_t_reg(1),-1)); break; // slt $t0,$t0,$t1
+                case '>': appendInstr(list,newInstr(INSTR_SGT,get_t_reg(0),get_t_reg(0),get_t_reg(1),-1)); break; // sgt $t0,$t0,$t1
                 default: fprintf(stderr, "OPERATOR NOT IMPLEMENTED\n");
             }
             appendInstrListToListShallow(list,temp = storeSymFromReg(quad->dest,get_t_reg(0))); freeInstrListOnly(temp); // store $t0 to dest
@@ -692,8 +712,6 @@ InstrList* genInitCode(Quad *quad) {
     } else if (quad->type == QUAD_INIT_DOUBLE) {
         fprintf(stderr,"NO DOUBLE INIT CODE IMPLEMENTED\n");
     } else fprintf(stderr, "ERROR GENERATING INIT CODE\n");
-    // QUAD_INIT_INT
-    // QUAD_INIT_DOUBLE
 
     return list;
 }
@@ -767,6 +785,15 @@ InstrList* generateFunctionMIPSCode(QuadList *function_code) {
         }
     }
 
+    // create epilogue sections
+    InstrList *epilogue = newInstrList();
+    appendInstr(epilogue,newInstrCommentDup("epilogue"));
+    appendInstr(epilogue,newInstr(INSTR_LW,get_fp_reg(),get_sp_reg(),NULL,0)); // lw $fp,0($sp)
+    appendInstr(epilogue,newInstr(INSTR_LW,get_ra_reg(),get_sp_reg(),NULL,8)); // lw $ra,8($sp)
+    appendInstr(epilogue,newInstr(INSTR_ADDU,get_sp_reg(),get_sp_reg(),NULL,frame_size)); // addu $sp,$sp,stack_size
+    appendInstr(epilogue,newInstr(INSTR_JR,NULL,NULL,NULL,-1)); // jr $ra
+
+
 
     for (qnode = function_code->head->next->next->next; qnode != NULL; qnode = qnode->next) {
         switch (qnode->data->type) {
@@ -796,6 +823,9 @@ InstrList* generateFunctionMIPSCode(QuadList *function_code) {
         case QUAD_RETRIEVE:
             temp_list = genRetrieveCode(qnode->data); break;
         case QUAD_RETURN:
+            temp_list = newInstrList();
+            appendInstrListToListShallow(temp_list,epilogue);
+            break;
         case QUAD_ENTER:
             temp_list = newInstrList(); break;
         default:
@@ -808,11 +838,13 @@ InstrList* generateFunctionMIPSCode(QuadList *function_code) {
         freeInstrListOnly(temp_list);
     }
 
-    appendInstr(function_list,newInstrCommentDup("epilogue"));
-    appendInstr(function_list,newInstr(INSTR_LW,get_fp_reg(),get_sp_reg(),NULL,0)); // lw $fp,0($sp)
-    appendInstr(function_list,newInstr(INSTR_LW,get_ra_reg(),get_sp_reg(),NULL,8)); // lw $ra,8($sp)
-    appendInstr(function_list,newInstr(INSTR_ADDU,get_sp_reg(),get_sp_reg(),NULL,frame_size)); // addu $sp,$sp,stack_size
-    appendInstr(function_list,newInstr(INSTR_JR,NULL,NULL,NULL,-1)); // jr $ra
+    // appendInstr(function_list,newInstrCommentDup("epilogue"));
+    // appendInstr(function_list,newInstr(INSTR_LW,get_fp_reg(),get_sp_reg(),NULL,0)); // lw $fp,0($sp)
+    // appendInstr(function_list,newInstr(INSTR_LW,get_ra_reg(),get_sp_reg(),NULL,8)); // lw $ra,8($sp)
+    // appendInstr(function_list,newInstr(INSTR_ADDU,get_sp_reg(),get_sp_reg(),NULL,frame_size)); // addu $sp,$sp,stack_size
+    // appendInstr(function_list,newInstr(INSTR_JR,NULL,NULL,NULL,-1)); // jr $ra
+
+    freeInstrListOnly(epilogue);
 
     return function_list;
 }
@@ -1293,6 +1325,9 @@ QuadList* generateFuncQuadList(Sym *func,StringKStringVHashTable *labels) {
 
 
     if (stmt_quads->tail->data->type != QUAD_RETURN) appendQuad(stmt_quads,newQuad(QUAD_RETURN,NULL,NULL,NULL,NULL,-1,-1,0.0));
+    else {
+
+    }
 
     return stmt_quads;
 }

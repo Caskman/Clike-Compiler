@@ -11,6 +11,9 @@
 #define INSTR_INT 7884
 #define INSTR_ADDU 183275
 #define INSTR_ADD 5825
+#define INSTR_SUB 9562
+#define INSTR_MUL 8552
+#define INSTR_DIV 7980
 #define INSTR_SUBU 79886
 #define INSTR_JR 67452
 #define INSTR_JAL 7854
@@ -18,6 +21,14 @@
 #define INSTR_LI 2659
 #define INSTR_LA 9573
 #define INSTR_SLL 18367
+#define INSTR_J 2846
+#define INSTR_SEQ 1836
+#define INSTR_SNE 9652
+#define INSTR_SLE 1659
+#define INSTR_SGE 5452
+#define INSTR_SLT 8765
+#define INSTR_SGT 1548
+#define INSTR_BEQ 2957
 
 // sw uses src,src2,i; src is for the value to store, src2 is the address, i is immediate
 // dummy uses src

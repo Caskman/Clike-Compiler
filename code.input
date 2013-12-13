@@ -6,16 +6,28 @@ void printnl() {
     printchar(10);
 }
 
-int x[10],size;
+void printintnl(i) int i; {
+    printint(i); printnl();
+}
+
+int modulo(n,q) int n,q; {
+    for (; n >= q ; n = n-q);
+    return n;
+}
+
+int isPrime(n) int n; {
+    int i;
+    for (i = n - 1; i > 1; i = i - 1) {
+        if (modulo(n,i) == 0) {
+            return 0;
+        };
+    };
+    return 1;
+}
+
 
 void main() {
-    size = 10;
-    x[0] = 5;
-    x[4] = 7;
-    x[7] = 9;
-    printint(x[0]); printnl();
-    printint(x[4]); printnl();
-    printint(x[7]); printnl();
+    
 }
 
 
