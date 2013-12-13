@@ -29,6 +29,8 @@
 #define INSTR_SLT 8765
 #define INSTR_SGT 1548
 #define INSTR_BEQ 2957
+#define INSTR_NEG 129476
+#define INSTR_XOR 6636
 
 // sw uses src,src2,i; src is for the value to store, src2 is the address, i is immediate
 // dummy uses src

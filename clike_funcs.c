@@ -369,6 +369,8 @@ void printInstr(Instr *data) {
     case INSTR_SGE: printf("\tsge %s,%s,%s\n",data->dest,data->src,data->src2); break;
     case INSTR_SLT: printf("\tslt %s,%s,%s\n",data->dest,data->src,data->src2); break;
     case INSTR_SGT: printf("\tsgt %s,%s,%s\n",data->dest,data->src,data->src2); break;
+    case INSTR_NEG: printf("\tneg %s,%s\n",data->dest,data->src); break;
+    case INSTR_XOR: printf("\txori %s,%s,%d\n",data->dest,data->src,data->i); break;
     default:
         fprintf(stderr,"\tINSTR PRINTING ERROR\n"); break;
     }
@@ -693,11 +695,28 @@ InstrList* genAssgCode(Quad *quad) {
 }
 
 InstrList* genInvCode(Quad *quad) {
+    InstrList *list = newInstrList(),*temp;
+    appendInstr(list,newInstrComment4("negate ",quad->src->id," into ",quad->dest->id));
 
-    // QUAD_NEG
-    // QUAD_INV
+    if (quad->type == QUAD_NEG) {
+        if (quad->src->type == INT || quad->src->type == CHAR) {
+            appendInstrListToListShallow(list,temp = loadSymToReg(quad->src,get_t_reg(0))); freeInstrListOnly(temp); // load src into $t0
+            appendInstr(list,newInstr(INSTR_NEG,get_t_reg(0),get_t_reg(0),NULL,-1)); // neg $t0,$t0
+            appendInstrListToListShallow(list,temp = storeSymFromReg(quad->dest,get_t_reg(0))); freeInstrListOnly(temp); // store $t0 to dest
+        } else if (quad->src->type == DOUBLE_DECL) {
+            fprintf(stderr, "DOUBLE NEG NOT IMPLEMENTED\n");
+        } else fprintf(stderr, "ERROR GENERATING NEG CODE\n");
+    } else if (quad->type == QUAD_INV) {
+        if (quad->src->type == INT || quad->src->type == CHAR) {
+            appendInstrListToListShallow(list,temp = loadSymToReg(quad->src,get_t_reg(0))); freeInstrListOnly(temp); // load src into $t0
+            appendInstr(list,newInstr(INSTR_XOR,get_t_reg(0),get_t_reg(0),NULL,1)); // xori $t0,$t0,1
+            appendInstrListToListShallow(list,temp = storeSymFromReg(quad->dest,get_t_reg(0))); freeInstrListOnly(temp); // store $t0 to dest
+        } else if (quad->src->type == DOUBLE_DECL) {
+            fprintf(stderr, "DOUBLE INV NOT IMPLEMENTED\n");
+        } else fprintf(stderr, "ERROR GENERATING NEG CODE\n");
+    } else fprintf(stderr, "ERROR GENERATING INV/NEG CODE\n");
 
-    return makeSEInstrList(newInstrCommentDup("invert a var..."));
+    return list;
 }
 
 InstrList* genInitCode(Quad *quad) {
@@ -837,12 +856,6 @@ InstrList* generateFunctionMIPSCode(QuadList *function_code) {
         appendInstrListToListShallow(function_list,temp_list);
         freeInstrListOnly(temp_list);
     }
-
-    // appendInstr(function_list,newInstrCommentDup("epilogue"));
-    // appendInstr(function_list,newInstr(INSTR_LW,get_fp_reg(),get_sp_reg(),NULL,0)); // lw $fp,0($sp)
-    // appendInstr(function_list,newInstr(INSTR_LW,get_ra_reg(),get_sp_reg(),NULL,8)); // lw $ra,8($sp)
-    // appendInstr(function_list,newInstr(INSTR_ADDU,get_sp_reg(),get_sp_reg(),NULL,frame_size)); // addu $sp,$sp,stack_size
-    // appendInstr(function_list,newInstr(INSTR_JR,NULL,NULL,NULL,-1)); // jr $ra
 
     freeInstrListOnly(epilogue);
 
