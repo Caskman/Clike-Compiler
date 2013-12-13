@@ -43,7 +43,7 @@ instrlist.c: instrlist_imp.h
 .PHONY: clean 
 
 clean:
-	rm -f clike *.a *.o clike.lex.* clike.tab.* `ls | grep .hashtable[.].` `ls | grep .list[.].` `ls | grep .hashtabletypes[.].` `ls | grep .entrylist_imp[.].` *.output
+	rm -f clike *.a *.o clike.lex.* clike.tab.* `ls | grep .hashtable[.].` `ls | grep .list[.].` `ls | grep .hashtabletypes[.].` `ls | grep .entrylist_imp[.].` *.output *.im
 
 
 

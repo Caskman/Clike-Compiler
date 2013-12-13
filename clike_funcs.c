@@ -353,6 +353,11 @@ void printInstr(Instr *data) {
     case INSTR_SUBU: printf("\tsubu %s,%s,%d\n",data->dest,data->src,data->i); break;
     case INSTR_LABEL: printf("%s:\n",data->src); break;
     case INSTR_JR: printf("\tjr $ra\n"); break;
+    case INSTR_JAL: printf("\tjal %s\n",data->src); break;
+    case INSTR_LI: printf("\tli %s,%d\n",data->dest,data->i); break;
+    case INSTR_ADD: printf("\tadd %s,%s,%s\n",data->dest,data->src,data->src2); break;
+    case INSTR_LA: printf("\tla %s,%s\n",data->dest,data->src); break;
+    case INSTR_SLL: printf("\tsll %s,%s,%d\n",data->dest,data->src,data->i); break;
     default:
         fprintf(stderr,"\tINSTR PRINTING ERROR\n"); break;
     }
@@ -390,7 +395,29 @@ Instr* newInstrCommentDup(String a) {
     return newInstrComment(newa);
 }
 
+Instr* newInstrComment2(String a,String b) {
+    String news = (String)malloc(sizeof(char)*(strlen(a) + strlen(b) + 1));
+    strcpy(news,a);
+    strcat(news,b);
+    return newInstrComment(news);
+}
 
+Instr* newInstrComment3(String a,String b,String c) {
+    String news = (String)malloc(sizeof(char)*(strlen(a) + strlen(b) + strlen(c) + 1));
+    strcpy(news,a);
+    strcat(news,b);
+    strcat(news,c);
+    return newInstrComment(news);
+}
+
+Instr* newInstrComment4(String a,String b,String c,String d) {
+    String news = (String)malloc(sizeof(char)*(strlen(a) + strlen(b) + strlen(c) + strlen(d) + 1));
+    strcpy(news,a);
+    strcat(news,b);
+    strcat(news,c);
+    strcat(news,d);
+    return newInstrComment(news);
+}
 
 
 //======================================
@@ -429,9 +456,11 @@ String reg_a3 = "$a3";
 String reg_sp = "$sp";
 String reg_ra = "$ra";
 String reg_fp = "$fp";
-String reg_t0 = "$fp";
-String reg_t1 = "$fp";
-String reg_t2 = "$fp";
+String reg_t0 = "$t0";
+String reg_t1 = "$t1";
+String reg_t2 = "$t2";
+String reg_v0 = "$v0";
+String reg_v1 = "$v1";
 String error_reg = "ERROR REG";
 
 String get_sp_reg() {return reg_sp;}
@@ -454,37 +483,125 @@ String get_t_reg(int i) {
     default: return error_reg;
     }
 }
+String get_v_reg(int i) {
+    switch (i) {
+    case 0: return reg_v0;
+    case 1: return reg_v1;
+    default: return error_reg;
+    }
+}
 
 
+InstrList* loadSymToReg(Sym *var,String reg) {
+    InstrList *list = newInstrList();
+    if (var->offset == -1) { // global var
+        appendInstr(list,newInstr(INSTR_LA,reg,var->id,NULL,-1)); // la reg,var_label
+        appendInstr(list,newInstr(INSTR_LW,reg,reg,NULL,0)); // lw reg,0(reg)
+    } else { // local var
+        appendInstr(list,newInstr(INSTR_LW,reg,get_fp_reg(),NULL,var->offset)); // lw reg,var_offset($fp)
+    }
+    return list;
+}
 
+InstrList* storeSymFromReg(Sym *var,String reg) {
+    InstrList *list = newInstrList();
+    if (var->offset == -1) { // global var
+        appendInstr(list,newInstr(INSTR_LA,get_t_reg(2),var->id,NULL,-1)); // la $t2,var_label
+        appendInstr(list,newInstr(INSTR_SW,NULL,reg,get_t_reg(2),0)); // sw reg,0($t2)
+    } else { // local var
+        appendInstr(list,newInstr(INSTR_SW,NULL,reg,get_fp_reg(),var->offset)); // sw reg,var_offset($fp)
+    }
+    return list;
+}
 
 InstrList* genRetrieveCode(Quad *quad) {
+    InstrList *list = newInstrList();
 
-    // QUAD_RETRIEVE
+    appendInstr(list,newInstrComment2("retrieve return value into ",quad->dest->id));
+    if (quad->op == INT || quad->op == CHAR) {
+        appendInstr(list,newInstr(INSTR_SW,NULL,get_v_reg(0),get_fp_reg(),quad->dest->offset)); // sw $v0,offset($fp)
+    } else if (quad->op == DOUBLE_DECL) {
+        fprintf(stderr, "DOUBLE RETRIEVAL NOT IMPLEMENTED\n");
+    } else fprintf(stderr, "ERROR GENERATING RETRIEVE CODE\n");
 
-    return makeSEInstrList(newInstrCommentDup("retrieve a return value..."));
+    return list;
 }
 
 InstrList* genRetValCode(Quad *quad) {
+    InstrList *list = newInstrList(),*temp;
 
+    appendInstr(list,newInstrComment2("return ",quad->src->id));
     // QUAD_RETVAL
+    if (quad->op == INT || quad->op == CHAR) {
+        appendInstrListToListShallow(list,temp = loadSymToReg(quad->src,get_v_reg(0))); freeInstrListOnly(temp); // load src to $t0
+        // appendInstr(list,newInstr(INSTR_LW,get_v_reg(0),get_fp_reg(),NULL,quad->src->offset)); // lw $v0,src_offset($fp)
+    } else if (quad->op == DOUBLE_DECL) {
+        fprintf(stderr, "DOUBLE RETVAL NOT IMPLEMENTED\n");
+    } else fprintf(stderr, "ERROR GENERATING RETVAL CODE\n");
 
-    return makeSEInstrList(newInstrCommentDup("set a var as a return value..."));
+    return list;
 }
 
 InstrList* genParamCode(Quad *quad) {
+    InstrList *list = newInstrList(),*temp;
+    appendInstr(list,newInstrComment2("set parameter ",toStr(quad->intcon)));
+
+    if (quad->intcon < 4) {
+        if (quad->op == INT || quad->op == CHAR) {
+            appendInstrListToListShallow(list,temp = loadSymToReg(quad->src,get_arg_reg(quad->intcon))); freeInstrListOnly(temp); // load src to an arg reg
+            // appendInstr(list,newInstr(INSTR_LW,get_arg_reg(quad->intcon),get_fp_reg(),NULL,quad->src->offset)); // lw $a{intcon},offset($fp)
+        } else if (quad->op == DOUBLE_DECL) {
+            appendInstr(list,newInstr(INSTR_ADDU,get_arg_reg(quad->intcon),get_fp_reg(),NULL,quad->src->offset)); // addu $a{intcon},$fp,offset
+        } else fprintf(stderr,"ERROR GENERATING PARAMETER CODE\n");
+    } else {
+        if (quad->op == INT || quad->op == CHAR) {
+            appendInstrListToListShallow(list,temp = loadSymToReg(quad->src,get_t_reg(0))); freeInstrListOnly(temp); // load src to $t0
+            // appendInstr(list,newInstr(INSTR_LW,get_t_reg(0),get_fp_reg(),NULL,quad->src->offset)); // lw $t0,offset($fp)
+            appendInstr(list,newInstr(INSTR_SUBU,get_sp_reg(),get_sp_reg(),NULL,4)); // subu $sp,$sp,4
+            appendInstr(list,newInstr(INSTR_SW,NULL,get_t_reg(0),get_sp_reg(),0)); // sw $t0,0($sp)
+        } else if (quad->op == DOUBLE_DECL) {
+            fprintf(stderr, "ERROR CREATING DOUBLE > 4 PARAMETER CODE\n");
+        } else fprintf(stderr,"ERROR GENERATING PARAMETER CODE\n");
+    }
+
 
     // QUAD_PARAM
 
-    return makeSEInstrList(newInstrCommentDup("assign a parameter..."));
+    return list;
 }
 
 InstrList* genIndexCode(Quad *quad) {
+    InstrList *list = newInstrList(),*temp;
 
-    // QUAD_INDX_L
-    // QUAD_INDX_R
 
-    return makeSEInstrList(newInstrCommentDup("index assign a var..."));
+    if (quad->type == QUAD_INDX_R) {
+        appendInstr(list,newInstrComment4("assign indexed value from ",quad->src->id," to ",quad->dest->id));
+        if (quad->dest->type == INT || quad->dest->type == CHAR) {
+            appendInstrListToListShallow(list,temp = loadSymToReg(quad->src2,get_t_reg(1))); freeInstrListOnly(temp); // load src2 into $t1
+            // appendInstr(list,newInstr(INSTR_LW,get_t_reg(1),get_fp_reg(),NULL,quad->src2->offset)); // lw $t1,src2_offset($fp)
+            appendInstr(list,newInstr(INSTR_SLL,get_t_reg(1),get_t_reg(1),NULL,2)); // sll $t1,$t1,2
+            appendInstr(list,newInstr(INSTR_LA,get_t_reg(0),quad->src->id,NULL,-2)); // la $t0,src_label
+            appendInstr(list,newInstr(INSTR_ADD,get_t_reg(0),get_t_reg(0),get_t_reg(1),-1)); // add $t0,$t0,$t1
+            appendInstr(list,newInstr(INSTR_LW,get_t_reg(0),get_t_reg(0),NULL,0)); // lw $t0,0($t0)
+            appendInstrListToListShallow(list,temp = storeSymFromReg(quad->dest,get_t_reg(0))); freeInstrListOnly(temp); // store $t0 to dest
+        } else if (quad->dest->type == DOUBLE_DECL) {
+            fprintf(stderr, "DOUBLE INDEX R NOT IMPLEMENTED\n");
+        } else fprintf(stderr, "ERROR RIGHT INDEX GEN\n");
+    } else if (quad->type == QUAD_INDX_L) {
+        appendInstr(list,newInstrComment4("assign value from ",quad->src2->id," to indexed var ",quad->dest->id));
+        if (quad->dest->type == INT || quad->dest->type == CHAR) {
+            appendInstr(list,newInstr(INSTR_LA,get_t_reg(0),quad->dest->id,NULL,-1)); // la $t0,dest_label
+            appendInstrListToListShallow(list,temp = loadSymToReg(quad->src,get_t_reg(1))); freeInstrListOnly(temp); // load src into $t1
+            appendInstr(list,newInstr(INSTR_SLL,get_t_reg(1),get_t_reg(1),NULL,2)); // sll $t1,$t1,2
+            appendInstr(list,newInstr(INSTR_ADD,get_t_reg(0),get_t_reg(0),get_t_reg(1),-1)); // add $t0,$t0,$t1
+            appendInstrListToListShallow(list,temp = loadSymToReg(quad->src2,get_t_reg(1))); freeInstrListOnly(temp); // load src2 into $t1
+            appendInstr(list,newInstr(INSTR_SW,NULL,get_t_reg(1),get_t_reg(0),0)); // sw $t1,0($t0)
+        } else if (quad->dest->type == DOUBLE_DECL) {
+            fprintf(stderr, "DOUBLE INDEX L NOT IMPLEMENTED\n");
+        } else fprintf(stderr, "ERROR RIGHT INDEX GEN\n");
+    } else fprintf(stderr, "ERROR GENERATING INDEXING CODE\n");
+
+    return list;
 }
 
 InstrList* genLabelCode(Quad *quad) {
@@ -502,19 +619,57 @@ InstrList* genBranchCode(Quad *quad) {
 }
 
 InstrList* genJumpCode(Quad *quad) {
+    InstrList *list = newInstrList();
 
+    if (quad->type == QUAD_CALL) {
+        appendInstr(list,newInstrComment2("call function ",quad->src->id));
+        int args_on_stack = quad->src->args_type_list->size - 4;
+        args_on_stack = (args_on_stack < 0) ? 0 : args_on_stack;
+        appendInstr(list,newInstr(INSTR_JAL,NULL,quad->src->id,NULL,-1)); // jal call
+        appendInstr(list,newInstr(INSTR_ADDU,get_sp_reg(),get_sp_reg(),NULL,args_on_stack*4)); // addu $sp,$sp,args_on_stack*4
+    } else if (quad->type == QUAD_GOTO) {
+        appendInstr(list,newInstrCommentDup("goto here..."));
+    } else {
+        fprintf(stderr, "ERROR CREATING JUMP MIPS CODE\n");
+    }
     // QUAD_GOTO
     // QUAD_CALL make sure to pop the stack if there are args on the stack
 
-    return makeSEInstrList(newInstrCommentDup("jump somewhere..."));
+    return list;
 }
 
 InstrList* genAssgCode(Quad *quad) {
+    InstrList *list = newInstrList(),*temp;
+    appendInstr(list,newInstrComment2("assign ",quad->dest->id));
+    if (quad->type == QUAD_MV) {
+        if (quad->src->type == INT || quad->src->type == CHAR) {
 
-    // QUAD_MV
-    // QUAD_ASSG
+            appendInstrListToListShallow(list,temp = loadSymToReg(quad->src,get_t_reg(0))); freeInstrListOnly(temp); // load src to $t0
+            // appendInstr(list,newInstr(INSTR_LW,get_t_reg(0),get_fp_reg(),NULL,quad->src->offset)); // lw $t0,src_offset($fp)
+            appendInstrListToListShallow(list,temp = storeSymFromReg(quad->dest,get_t_reg(0))); freeInstrListOnly(temp); // store $t0 to dest
+            // appendInstr(list,newInstr(INSTR_SW,NULL,get_t_reg(0),get_fp_reg(),quad->dest->offset)); // sw $t0,dest_offset($fp)
+        } else {
+            fprintf(stderr,"MOVE ASSG FOR DOUBLES NOT IMPLEMENTED\n");
+        }
+    } else if (quad->type == QUAD_ASSG) {
+        if (quad->src->type == INT || quad->src->type == CHAR) {
+            appendInstrListToListShallow(list,temp = loadSymToReg(quad->src,get_t_reg(0))); freeInstrListOnly(temp); // load src to $t0
+            appendInstrListToListShallow(list,temp = loadSymToReg(quad->src2,get_t_reg(1))); freeInstrListOnly(temp); // load src2 to $t1
 
-    return makeSEInstrList(newInstrCommentDup("assign a var..."));
+            // appendInstr(list,newInstr(INSTR_LW,get_t_reg(0),get_fp_reg(),NULL,quad->src->offset)); // lw $t0,src_offset($fp)
+            // appendInstr(list,newInstr(INSTR_LW,get_t_reg(1),get_fp_reg(),NULL,quad->src2->offset)); // lw $t1,src2_offset($fp)
+            switch (quad->op) {
+                case '+': appendInstr(list,newInstr(INSTR_ADD,get_t_reg(0),get_t_reg(0),get_t_reg(1),-1)); break; // add $t0,$t0,$t1
+                default: fprintf(stderr, "OPERATOR NOT IMPLEMENTED\n");
+            }
+            appendInstrListToListShallow(list,temp = storeSymFromReg(quad->dest,get_t_reg(0))); freeInstrListOnly(temp); // store $t0 to dest
+            // appendInstr(list,newInstr(INSTR_SW,NULL,get_t_reg(0),get_fp_reg(),quad->dest->offset)); // sw $t0,dest_offset($fp)
+        } else if (quad->src->type == DOUBLE_DECL) {
+            fprintf(stderr, "DOUBLE OPERATIONS NO IMPLEMENTED\n");
+        }
+    }
+
+    return list;
 }
 
 InstrList* genInvCode(Quad *quad) {
@@ -527,10 +682,16 @@ InstrList* genInvCode(Quad *quad) {
 
 InstrList* genInitCode(Quad *quad) {
 
-    InstrList *list = newInstrList();
+    InstrList *list = newInstrList(),*temp;
 
-    // appendInstr(list,newInstrCommentDup("init "));
-
+    appendInstr(list,newInstrCommentDup(catDupWoP("init ",quad->dest->id)));
+    if (quad->type == QUAD_INIT_INT) {
+        appendInstr(list,newInstr(INSTR_LI,get_t_reg(0),NULL,NULL,quad->intcon)); // li $t0,intcon
+        appendInstrListToListShallow(list,temp = storeSymFromReg(quad->dest,get_t_reg(0))); freeInstrListOnly(temp); // store $t0 to dest
+        // appendInstr(list,newInstr(INSTR_SW,NULL,get_t_reg(0),get_fp_reg(),quad->dest->offset)); // sw $t0,offset($fp)
+    } else if (quad->type == QUAD_INIT_DOUBLE) {
+        fprintf(stderr,"NO DOUBLE INIT CODE IMPLEMENTED\n");
+    } else fprintf(stderr, "ERROR GENERATING INIT CODE\n");
     // QUAD_INIT_INT
     // QUAD_INIT_DOUBLE
 
@@ -551,10 +712,12 @@ InstrList* generateFunctionMIPSCode(QuadList *function_code) {
     // create space on the stack, save $fp and $ra, and update $fp
     appendInstr(function_list,newInstr(INSTR_LABEL,NULL,function_code->head->next->data->string,NULL,-1));
     appendInstr(function_list,newInstrCommentDup("prologue"));
-    appendInstr(function_list,newInstr(INSTR_SUBU,get_sp_reg(),get_sp_reg(),NULL,enterquad->intcon + 8)); // subu $sp,$sp,(8+locals_bytes)
-    appendInstr(function_list,newInstr(INSTR_SW,NULL,get_ra_reg(),get_sp_reg(),4)); // sw $ra,4($sp)
+    int frame_size = enterquad->intcon + 32;
+    frame_size = (frame_size%8 == 0)?frame_size:frame_size + 4;
+    appendInstr(function_list,newInstr(INSTR_SUBU,get_sp_reg(),get_sp_reg(),NULL,frame_size)); // subu $sp,$sp,(32+locals_bytes)
+    appendInstr(function_list,newInstr(INSTR_SW,NULL,get_ra_reg(),get_sp_reg(),8)); // sw $ra,8($sp)
     appendInstr(function_list,newInstr(INSTR_SW,NULL,get_fp_reg(),get_sp_reg(),0)); // sw $fp,0($sp)
-    appendInstr(function_list,newInstr(INSTR_ADDU,get_fp_reg(),get_sp_reg(),NULL,enterquad->intcon + 4)); // addu $fp,$sp,(4 + locals_bytes)
+    appendInstr(function_list,newInstr(INSTR_ADDU,get_fp_reg(),get_sp_reg(),NULL,frame_size - 4)); // addu $fp,$sp,(28 + locals_bytes)
 
     // create local variable offsets from frame pointer
     StringKSymVEntryList *splats = splatStringKSymVHashTable(func_sym->scope);
@@ -566,7 +729,7 @@ InstrList* generateFunctionMIPSCode(QuadList *function_code) {
         } else if (enode->data->value->type == INT || enode->data->value->type == CHAR) {
             enode->data->value->offset = offset;
             offset -= 4;
-        }
+        } else fprintf(stderr, "ERROR GENERATING LOCAL VAR OFFSETS\n");
     }
 
     appendInstr(function_list,newInstrCommentDup("init args"));
@@ -574,7 +737,7 @@ InstrList* generateFunctionMIPSCode(QuadList *function_code) {
     StringNode *snode; int i,total_num_args = func_sym->args_id_list->size;
     for (i = 1, snode = func_sym->args_id_list->head->next; snode != NULL; i++, snode = snode->next) {
         Sym *sym = getValueStringKSymVHashTable(func_sym->scope,snode->data);
-        appendInstr(function_list,newInstrComment(catDupWoP("init ",sym->id)));
+        appendInstr(function_list,newInstrComment2("init ",sym->id));
         int argoffset = 4*(total_num_args - i + 1);
         String arg_reg = get_arg_reg(i-1);
 
@@ -646,9 +809,9 @@ InstrList* generateFunctionMIPSCode(QuadList *function_code) {
     }
 
     appendInstr(function_list,newInstrCommentDup("epilogue"));
-    appendInstr(function_list,newInstr(INSTR_LW,get_fp_reg(),get_sp_reg(),NULL,0)); // lw $fp,fp_offset($sp)
-    appendInstr(function_list,newInstr(INSTR_LW,get_ra_reg(),get_sp_reg(),NULL,4)); // lw $ra,ra_offset($sp)
-    appendInstr(function_list,newInstr(INSTR_ADDU,get_sp_reg(),get_sp_reg(),NULL,enterquad->intcon + 8)); // addu $sp,$sp,stack_size
+    appendInstr(function_list,newInstr(INSTR_LW,get_fp_reg(),get_sp_reg(),NULL,0)); // lw $fp,0($sp)
+    appendInstr(function_list,newInstr(INSTR_LW,get_ra_reg(),get_sp_reg(),NULL,8)); // lw $ra,8($sp)
+    appendInstr(function_list,newInstr(INSTR_ADDU,get_sp_reg(),get_sp_reg(),NULL,frame_size)); // addu $sp,$sp,stack_size
     appendInstr(function_list,newInstr(INSTR_JR,NULL,NULL,NULL,-1)); // jr $ra
 
     return function_list;
@@ -900,7 +1063,7 @@ QuadList* generateFuncCallQuadList(Sym *callee,ExprList *arg_list,Sym *func,int 
 
     // set parameters
     for (i = 0, qnode = parameter_quads->head->next, tnode = callee->args_type_list->head->next;
-         qnode != NULL; qnode = qnode->next, tnode = tnode->next) {
+         qnode != NULL; qnode = qnode->next, tnode = tnode->next, i++) {
         result = getValueDest(qnode->data);
         appendQuad(list,newQuad(QUAD_PARAM,NULL,result,NULL,NULL,*tnode->data,i,0.0)); // set parameter
         freeQuadListOnly(qnode->data);
@@ -951,7 +1114,7 @@ QuadList* generateReturnStmtQuadList(Stmt *return_stmt,Sym *func,int *locals_byt
 
     Sym *value_result = getValueDest(value);
     appendQuadListToListShallow(list,value); // eval expr
-    appendQuad(list,newQuad(QUAD_RETVAL,NULL,value_result,NULL,NULL,-1,-1,0.0)); // set as return val
+    appendQuad(list,newQuad(QUAD_RETVAL,NULL,value_result,NULL,NULL,func->type,-1,0.0)); // set as return val
     appendQuad(list,newQuad(QUAD_RETURN,NULL,NULL,NULL,NULL,-1,-1,0.0)); // return
 
 
@@ -1114,8 +1277,10 @@ QuadList* generateFuncQuadList(Sym *func,StringKStringVHashTable *labels) {
         strcat(func_label,func->id);
     }
     // generate label for the beginning of this function
+    func->id = func_label;
     putStringKStringVHashTable(labels,dupString(&func_label),dupString(&func_label));
     Quad *label_quad = newQuad(QUAD_LABEL,NULL,NULL,NULL,func_label,-1,-1,0.0);
+
 
     // now generate quads for the function body
     // pass the function symbol and the address of the locals_bytes so that if temporaries 

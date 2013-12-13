@@ -23,6 +23,9 @@ typedef struct sym {
     int offset;
 } Sym;
 
+// use offset to indicate where the variable is stored in relation to the frame pointer
+// offset as -1 indicates that it is a global variable
+
 void printString(String *data);
 void printSym(Sym *data);
 unsigned int hashString(String *key);

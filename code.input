@@ -1,2 +1,21 @@
-void f(a,b,c,d,e,f,g,h) double a,b,c,d,e,f,g,h;{}
-void main(){}
+
+void printint(int);
+void printchar(char);
+
+void printnl() {
+    printchar(10);
+}
+
+int x[10],size;
+
+void main() {
+    size = 10;
+    x[0] = 5;
+    x[4] = 7;
+    x[7] = 9;
+    printint(x[0]); printnl();
+    printint(x[4]); printnl();
+    printint(x[7]); printnl();
+}
+
+
