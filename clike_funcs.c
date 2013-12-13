@@ -452,6 +452,25 @@ String toStr(int i) {
     return s;
 }
 
+String getLabelString(String prefix,String content,StringKStringVHashTable *labels) {
+    String suffix,s; int i;
+
+    for (i = 0; ; i++) {
+        suffix = toStr(i);
+        s = (String)malloc(sizeof(char)*(strlen(func_name) + strlen(content) + strlen(suffix) + 1));
+        strcpy(s,func_name);
+        strcat(s,content);
+        strcat(s,suffix);
+        if (getValueStringKStringVHashTable(labels,&s) == NULL) {
+            String *t = (String*)malloc(sizeof(String));
+            *t = s;
+            putStringKStringVHashTable(labels,dupString(t),t);
+            return s;
+        }
+    }
+}
+
+
 //======================================
 
 // TODO
@@ -687,7 +706,7 @@ InstrList* genAssgCode(Quad *quad) {
             appendInstrListToListShallow(list,temp = storeSymFromReg(quad->dest,get_t_reg(0))); freeInstrListOnly(temp); // store $t0 to dest
             // appendInstr(list,newInstr(INSTR_SW,NULL,get_t_reg(0),get_fp_reg(),quad->dest->offset)); // sw $t0,dest_offset($fp)
         } else if (quad->src->type == DOUBLE_DECL) {
-            fprintf(stderr, "DOUBLE OPERATIONS NO IMPLEMENTED\n");
+            // 
         }
     }
 
@@ -719,7 +738,7 @@ InstrList* genInvCode(Quad *quad) {
     return list;
 }
 
-InstrList* genInitCode(Quad *quad) {
+InstrList* genInitCode(Quad *quad,StringKStringVHashTable *labels) {
 
     InstrList *list = newInstrList(),*temp;
 
@@ -729,7 +748,15 @@ InstrList* genInitCode(Quad *quad) {
         appendInstrListToListShallow(list,temp = storeSymFromReg(quad->dest,get_t_reg(0))); freeInstrListOnly(temp); // store $t0 to dest
         // appendInstr(list,newInstr(INSTR_SW,NULL,get_t_reg(0),get_fp_reg(),quad->dest->offset)); // sw $t0,offset($fp)
     } else if (quad->type == QUAD_INIT_DOUBLE) {
-        fprintf(stderr,"NO DOUBLE INIT CODE IMPLEMENTED\n");
+        String label = getLabelString("doubleinit_",quad->dest->id,labels);
+        appendInstr(list,newInstr(INSTR_DATA,NULL,NULL,NULL,-1)); // .data
+        appendInstr(list,newInstr(INSTR_DOUBLECONST,NULL,label,NULL,quad->doublecon)); // label: .double const
+        appendInstr(list,newInstr(INSTR_TEXT,NULL,NULL,NULL,-1)); // .text
+        appendInstr(list,newInstr(INSTR_LA,get_t_reg(0),label,NULL,-1)); // la $t0,label
+        appendInstr(list,newInstr(INSTR_LW,get_t_reg(1),get_t_reg(0),NULL,0)); // lw $t1,0($t0)
+        appendInstr(list,newInstr(INSTR_SW,NULL,get_t_reg(1),get_fp_reg(),quad->dest->offset)); // sw $t1,dest_offset($fp)
+        appendInstr(list,newInstr(INSTR_LW,get_t_reg(1),get_t_reg(0),NULL,4)); // lw $t1,4($t0)
+        appendInstr(list,newInstr(INSTR_SW,NULL,get_t_reg(1),get_fp_reg(),quad->dest->offset + 4)); // sw $t1,dest_offset+4($fp)
     } else fprintf(stderr, "ERROR GENERATING INIT CODE\n");
 
     return list;
@@ -739,7 +766,7 @@ void errorMIPSGen(String s) {
     fprintf(stderr,"\tERROR QUAD SWITCH TO MIPS %s\n",s);
 }
 
-InstrList* generateFunctionMIPSCode(QuadList *function_code) {
+InstrList* generateFunctionMIPSCode(QuadList *function_code,StringKStringVHashTable *labels) {
     if (function_code->size < 3) return newInstrList();
     QuadNode *qnode;
     InstrList *function_list = newInstrList(),*temp_list;
@@ -770,7 +797,7 @@ InstrList* generateFunctionMIPSCode(QuadList *function_code) {
     }
 
     appendInstr(function_list,newInstrCommentDup("init args"));
-    // retrieve argument values and init the local vars to those values
+    // retrieve argument values and init their local vars to those values
     StringNode *snode; int i,total_num_args = func_sym->args_id_list->size;
     for (i = 1, snode = func_sym->args_id_list->head->next; snode != NULL; i++, snode = snode->next) {
         Sym *sym = getValueStringKSymVHashTable(func_sym->scope,snode->data);
@@ -818,7 +845,7 @@ InstrList* generateFunctionMIPSCode(QuadList *function_code) {
         switch (qnode->data->type) {
         case QUAD_INIT_INT:
         case QUAD_INIT_DOUBLE:
-            temp_list = genInitCode(qnode->data); break;
+            temp_list = genInitCode(qnode->data,labels); break;
         case QUAD_NEG:
         case QUAD_INV:
             temp_list = genInvCode(qnode->data); break;
@@ -894,13 +921,13 @@ int isGlobalList(QuadList *qlist) {
     else return 0;
 }
 
-void generateMIPS(QuadListList *code) {
+void generateMIPS(QuadListList *code,StringKStringVHashTable *labels) {
     InstrList *final_code = newInstrList(),*instrs;
     QuadListNode *qlnode;
     for (qlnode = code->head->next; qlnode != NULL; qlnode = qlnode->next) {
         if (isGlobalList(qlnode->data)) {
             instrs = generateGlobalMIPSCode(qlnode->data);
-        } else instrs = generateFunctionMIPSCode(qlnode->data);
+        } else instrs = generateFunctionMIPSCode(qlnode->data,labels);
         appendInstrListToListShallow(final_code,instrs);
         freeInstrListOnly(instrs);
     }
@@ -957,24 +984,9 @@ Sym* getTempSym(StringKSymVHashTable *scope,int *locals_bytes,Type type) {
 }
 
 Quad* getLabel(String func_name,StringKStringVHashTable *labels,String content) {
-    String suffix,s; int i;
-
-    for (i = 0; ; i++) {
-        suffix = toStr(i);
-        s = (String)malloc(sizeof(char)*(strlen(func_name) + strlen(content) + strlen(suffix) + 1));
-        strcpy(s,func_name);
-        strcat(s,content);
-        strcat(s,suffix);
-        if (getValueStringKStringVHashTable(labels,&s) == NULL) {
-            Quad *q = newQuad(QUAD_LABEL,NULL,NULL,NULL,s,-1,-1,0.0);
-            String *t = (String*)malloc(sizeof(String));
-            *t = s;
-            putStringKStringVHashTable(labels,dupString(t),t);
-            return q;
-        }
-        free(s);
-    } 
-    return NULL;
+    String s = getLabelString(func_name,content,labels);
+    
+    return newQuad(QUAD_LABEL,NULL,NULL,NULL,s,-1,-1,0.0);
 }
 
 void exprQuadError() {
@@ -1423,7 +1435,7 @@ void generateCode(SymList *funcs) {
 
     if (print_quads) printQuadListList(functioncode);
     else {
-        generateMIPS(functioncode);
+        generateMIPS(functioncode,labels);
     }
 
     QuadListNode *qnode;
